@@ -1,0 +1,43 @@
+[package]
+name = "tantra-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Tantra quantitative AI workstation & developer CLI implementing the Quantcept command hierarchy"
+
+[lib]
+name = "tantra_cli"
+
+[[bin]]
+name = "tantra"
+path = "src/main.rs"
+
+[dependencies]
+tantra-core.workspace = true
+tantra-ui-api-wasm.workspace = true
+tantra-ui-core.workspace = true
+tantra-tui.workspace = true
+tantra-highlight.workspace = true
+tantra-agent-core.workspace = true
+tantra-agent-chat.workspace = true
+tantra-agent-llm.workspace = true
+tantra-agent-chat-tools.workspace = true
+tantra-runtime-jobs.workspace = true
+tantra-runtime-api.workspace = true
+tantra-runtime-api-rest.workspace = true
+tokio = { workspace = true, features = ["full"] }
+futures.workspace = true
+rust_decimal.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+toml.workspace = true
+async-trait = "0.1"
+
+[dev-dependencies]
+tempfile = "3"

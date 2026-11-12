@@ -1,0 +1,31 @@
+[package]
+name = "tantra-ui-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "WASM-safe Tantra workstation app: router, screener, strategy studio, simulator, and system features"
+
+[lib]
+name = "tantra_ui_app"
+
+[dependencies]
+tantra-core.workspace = true
+tantra-ui-core.workspace = true
+tantra-ui-assets.workspace = true
+tantra-ui-charts.workspace = true
+tantra-ui-client.workspace = true
+tantra-ui-api-wasm.workspace = true
+tantra-highlight.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+rust_decimal.workspace = true
+# Enables the `rng-getrandom` feature on the shared `uuid` crate so that
+# `tantra-core`'s uuid dependency (v4) compiles on wasm32-unknown-unknown.
+uuid = { workspace = true, features = ["rng-getrandom"] }
+# Enables getrandom's `wasm_js` backend for wasm32-unknown-unknown.
+getrandom = { workspace = true }
+
+[dev-dependencies]
+serde_json.workspace = true

@@ -1,0 +1,16 @@
+[package]
+name = "tantra-ui-charts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Decimal-precise chart geometry primitives for the Tantra workstation (openalgo-charts bridge)"
+
+[lib]
+name = "tantra_ui_charts"
+
+[dependencies]
+tantra-core.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true

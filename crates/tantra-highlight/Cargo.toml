@@ -1,0 +1,13 @@
+[package]
+name = "tantra-highlight"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Zero-I/O WASM-safe hand-rolled syntax highlighter for the Tantra workstation"
+
+[lib]
+name = "tantra_highlight"
+
+[dependencies]

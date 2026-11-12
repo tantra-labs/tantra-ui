@@ -8,8 +8,8 @@ prod: build-prod
 build-prod:
 	cargo build --workspace --profile prod
 	@mkdir -p target/debug target/release
-	@ln -sf ../prod/vyapaar target/debug/vyapaar 2>/dev/null || true
-	@ln -sf ../prod/vyapaar target/release/vyapaar 2>/dev/null || true
+	@ln -sf ../prod/tantra target/debug/tantra 2>/dev/null || true
+	@ln -sf ../prod/tantra target/release/tantra 2>/dev/null || true
 
 release: build-release
 build-release:

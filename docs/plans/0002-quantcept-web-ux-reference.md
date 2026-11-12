@@ -1,11 +1,11 @@
 # 0002 — UX reference for the `AgentChat` tab, captured from a live product session
 
 > **Status**: reference — written by one agent after a hands-on session against a live product
-> the user has an account on, intended to be read by whoever builds out `vyapaar-tui`'s
-> `AgentChat` tab, `vyapaar-cli`'s `Ask` command, and `vyapaar-agent-chat`.
+> the user has an account on, intended to be read by whoever builds out `tantra-tui`'s
+> `AgentChat` tab, `tantra-cli`'s `Ask` command, and `tantra-agent-chat`.
 > **Depends on reading**: [`0001-agent-chat-terminal-from-artha.md`](./0001-agent-chat-terminal-from-artha.md)
-> (crate split and scope correction) and `vyapaar-agent/docs/design/0001-chat-assistant-and-superset-capabilities.md`
-> (the `vyapaar-agent-chat` / `vyapaar-agent-chat-tools` design this doc's features ultimately
+> (crate split and scope correction) and `tantra-agent/docs/design/0001-chat-assistant-and-superset-capabilities.md`
+> (the `tantra-agent-chat` / `tantra-agent-chat-tools` design this doc's features ultimately
 > have to be implemented against). **This doc inherits that design's implementation gate: none of
 > this is to be built until the `honba-*` migrations (Milestones 3.1 and 3.2) are complete.**
 
@@ -44,11 +44,11 @@ Both are backed by the same turn-execution engine (same tool calls, same streami
 promotion action instead of a reply box by default, and with the auto-generated title ("AAPL
 Stock Drivers Today") doubling as the dashboard sidebar entry.
 
-**Mapping**: `vyapaar-agent-core`'s session model already treats every exchange as a turn inside
+**Mapping**: `tantra-agent-core`'s session model already treats every exchange as a turn inside
 a session (`SessionHandle`); nothing new is needed at that layer. What's missing from the existing
-Artha-derived design is the *UI-level* distinction — `vyapaar-cli`'s `Ask` command producing a
+Artha-derived design is the *UI-level* distinction — `tantra-cli`'s `Ask` command producing a
 plain one-shot answer (no persisted multi-turn session needed) is the CLI-native equivalent of
-`Answer`, and `vyapaar-tui`'s `AgentChat` tab is the `Chat` equivalent. A TUI could still offer a
+`Answer`, and `tantra-tui`'s `AgentChat` tab is the `Chat` equivalent. A TUI could still offer a
 lightweight "quick ask" overlay (bound to a keystroke from any tab, not just inside `AgentChat`)
 that mirrors `Answer`'s "ask without committing to a thread" ergonomics — flagged here as a nice-
 to-have, not a requirement.
@@ -119,12 +119,12 @@ block types interleaved in order:
 A terminal can't render a live interactive candlestick card. The TUI-native adaptation: render
 chart-bearing answer segments as either (a) a compact braille/unicode sparkline inline (good
 enough for "down 1.5% over 5 days" at a glance) with a keybinding to open the full chart in the
-system browser or a `vyapaar-market` screener tab, or (b) a placeholder card
+system browser or a `tantra-market` screener tab, or (b) a placeholder card
 (`[AAPL daily candles, last 30 sessions — press 'v' to view]`) that hands off to a plotting
 surface outside the terminal. Either way, the *chart-as-a-citable-artifact-inline-in-the-answer*
 pattern is worth keeping — don't downgrade it to "the model just mentions numbers in prose."
 
-The source-chip bar is new relative to anything in the existing Artha/vyapaar design docs. A
+The source-chip bar is new relative to anything in the existing Artha/tantra design docs. A
 terminal-native version is a one-line footer under the answer: `Sources: seekingalpha.com,
 marketbeat.com, stocktitan.net +4 more (press 's' for list)`, expandable to a list view with the
 specific query/URL each tool call used (recoverable from the already-planned per-call `ToolPlan`
@@ -134,7 +134,7 @@ metadata — this needs no new data model, only a renderer that aggregates it tu
 
 The product's "Agents" page is a single settings surface worth replicating in spirit (not
 necessarily UI-for-UI) because it cleanly separates three independent knobs that the existing
-`vyapaar-agent-chat` design doc left as open/deferred:
+`tantra-agent-chat` design doc left as open/deferred:
 
 - **Persona selection** — eight built-in personas (`QuantceptAI` the generalist/default, `Analyst`,
   `Devil's Advocate`, `Macro Strategist`, `Portfolio Manager`, `Quant`, `Risk Manager`, `Trader`,
@@ -142,7 +142,7 @@ necessarily UI-for-UI) because it cleanly separates three independent knobs that
   user-created-agent slot (capped at 20, "give it a role, a focus, a method, or describe it and
   let QuantceptAI draft it"). This is effectively a named, swappable **system-prompt preset** —
   nothing more exotic than that. It maps directly onto the `PromptBuilder`/`PromptContributor`
-  model already in `artha-core`'s HLD and inherited by `vyapaar-agent-chat`: a persona is a
+  model already in `artha-core`'s HLD and inherited by `tantra-agent-chat`: a persona is a
   contributor that supplies a different stable block, selected per-session or per-message.
 - **Effort and thinking** — a single Low/Medium/High/Extra High/Max slider, each level showing its
   behavior in one line ("Balanced depth and cost. Thinks through complex questions. · 2 credits
@@ -151,14 +151,14 @@ necessarily UI-for-UI) because it cleanly separates three independent knobs that
   thinking tokens billed like any other output). Picking a persona applies its default effort,
   overridable globally here or per-message from the composer. This is a clean, reusable
   three-variable model — **effort tier, extended-thinking on/off, and per-persona defaults** — and
-  is worth adopting as-is for `vyapaar-agent-chat`'s request shape, independent of whether
-  `vyapaar-labs` ever bills in credits.
+  is worth adopting as-is for `tantra-agent-chat`'s request shape, independent of whether
+  `tantra-labs` ever bills in credits.
 - **"Your instructions"** — a free-text box ("What should QuantceptAI keep in mind about you?
   Your desk, the markets you cover, how you like numbers presented.") explicitly scoped as
   *"Added to every message, whichever agent answers"* and *"synced to your account · never include
   secrets or MNPI"*, with a separate link to **"Manage memory"** for what the assistant has learned
   from past chats. This is precisely the stable-profile / per-turn-notice split already resolved
-  in `vyapaar-agent/docs/design/0001-chat-assistant-and-superset-capabilities.md` (§ memory via
+  in `tantra-agent/docs/design/0001-chat-assistant-and-superset-capabilities.md` (§ memory via
   extended `PromptBuilder`) — this observation is a confirmation of that design choice, not a
   change to it. Worth lifting verbatim: the explicit **"never include secrets or MNPI"** inline
   warning text on the instructions box, and the account-level (not session-level) scope of these
@@ -167,14 +167,14 @@ necessarily UI-for-UI) because it cleanly separates three independent knobs that
   - `Auto-approve agent actions` — *"Run tools that change your data (monitors, schedules,
     portfolio edits) without asking first."* Off by default. This is the user-facing control for
     exactly the permission-prompt-as-event pattern already designed into `artha-core`/
-    `vyapaar-agent-chat` (`ToolTraits::confirm`) — confirms that confirmation should be a
+    `tantra-agent-chat` (`ToolTraits::confirm`) — confirms that confirmation should be a
     per-account toggle the user sets once, not a per-call nag, for tools the account has decided
     it trusts.
   - `Next-step suggestions` — *"After an answer, offer follow-ups you can run with one click or the
     1–9 keys."* Numbered quick-replies after every answer, directly clickable or dispatched via a
     numeric keybinding. This is a genuinely new UI affordance not present in any existing
-    Artha/vyapaar doc, and it's cheap to add to a TUI: the TUI already owns keybinding dispatch, so
-    rendering the model's suggested follow-ups (if `vyapaar-agent-chat` starts returning them as
+    Artha/tantra doc, and it's cheap to add to a TUI: the TUI already owns keybinding dispatch, so
+    rendering the model's suggested follow-ups (if `tantra-agent-chat` starts returning them as
     structured output alongside the answer) as a numbered list the user can hit `1`-`9` on is a
     small, high-value addition to `AgentChat`'s keymap.
 
@@ -185,9 +185,9 @@ terminal all land here."* The Portfolio page states: *"Synced with the Quantcept
 confirm, from the product side rather than just architectural inference, that sessions and
 portfolios are account-scoped server/local-store state shared across every client surface
 (web app, dashboard, and CLI/TUI) rather than siloed per-client. This matches — and is a useful
-external confirmation of — the existing `vyapaar-agent-chat` `SessionStore` trait design
-(owned by `vyapaar-agent-chat`, implemented by `vyapaar-runtime-persistence`) and
-`PortfolioReader` (owned by chat-tools, implemented by `vyapaar-runtime-api`): nothing to change,
+external confirmation of — the existing `tantra-agent-chat` `SessionStore` trait design
+(owned by `tantra-agent-chat`, implemented by `tantra-runtime-persistence`) and
+`PortfolioReader` (owned by chat-tools, implemented by `tantra-runtime-api`): nothing to change,
 just a concrete product-level reason those seams were drawn as traits rather than assuming a
 single process owns the data.
 
@@ -196,8 +196,8 @@ single process owns the data.
 The dashboard's market-data surfaces — Top assets ticker strip, Market brief ("Write today's
 brief" one-click macro summary), multi-market scope selector (US markets / Indices / Crypto /
 Commodities / Bonds / Forex / ETFs / Funds / Futures), Watchlist panel, News feed — are **not**
-part of this reference. They belong to `vyapaar-tui`'s `Screener`/`Portfolio` tabs and
-`vyapaar-market`'s own data model, which already have their own migration guides and are
+part of this reference. They belong to `tantra-tui`'s `Screener`/`Portfolio` tabs and
+`tantra-market`'s own data model, which already have their own migration guides and are
 explicitly *not* the `artha`/chat lineage this doc and 0001 are tracing. Mentioned here only so
 the next reader doesn't mistake their absence for an oversight.
 
@@ -205,25 +205,25 @@ the next reader doesn't mistake their absence for an oversight.
 
 | Observed pattern | Already covered by existing design? | Action |
 |---|---|---|
-| `Answer` (one-shot) vs `Chat` (thread) | Session/turn model: yes. UI-level distinction: no | `vyapaar-cli Ask` = one-shot; `AgentChat` tab = thread; optional "quick ask" overlay is a nice-to-have |
+| `Answer` (one-shot) vs `Chat` (thread) | Session/turn model: yes. UI-level distinction: no | `tantra-cli Ask` = one-shot; `AgentChat` tab = thread; optional "quick ask" overlay is a nice-to-have |
 | Preamble sentence before tools | Yes (plain assistant text in event stream) | No change needed |
 | Grouped, multi-round tool calls with per-call live status | Tool execution: yes. Grouped-collapse rendering: no | Add a "tool-call group" block type/widget to the `AgentChat` rendering model |
 | Collapsed reasoning/thinking between rounds | Yes (`ChatEvent`/thinking already modeled in LLM layer) | Ensure TUI renders it collapsed, distinct from plan text and final answer |
-| Inline bold-lead, parenthetical-citation markdown style | Rendering: yes (markdown pipeline exists) | Adopt as the house answer style for `vyapaar-agent-chat`'s system prompt |
+| Inline bold-lead, parenthetical-citation markdown style | Rendering: yes (markdown pipeline exists) | Adopt as the house answer style for `tantra-agent-chat`'s system prompt |
 | Embedded chart inline in the answer | No | TUI-native adaptation: sparkline inline + handoff keybinding to full chart (§2) |
 | Turn-scoped, deduplicated source-chip bar | No | One-line footer + expandable list, built from existing per-call `ToolPlan` metadata |
 | Named personas as system-prompt presets | `PromptContributor` model: yes. Persona catalog/UI: no | Model as a `PromptContributor` variant selectable per session/message |
-| Effort tier + extended-thinking toggle + per-persona defaults | Partially (effort mentioned in `artha-llm`/`artha-core`) | Adopt the three-variable shape as-is for `vyapaar-agent-chat` request params |
+| Effort tier + extended-thinking toggle + per-persona defaults | Partially (effort mentioned in `artha-llm`/`artha-core`) | Adopt the three-variable shape as-is for `tantra-agent-chat` request params |
 | Account-level "Your instructions" + "never include secrets/MNPI" | Design: yes (superset-capabilities doc) | Confirmed, no change; worth lifting the inline warning copy |
 | `Auto-approve agent actions` toggle | `ToolTraits::confirm`: yes. Account-level toggle: no | Add an account/session preference gating the confirm-prompt path |
-| Numbered (1–9) next-step suggestions | No | New: have `vyapaar-agent-chat` optionally return structured follow-up suggestions; TUI renders + keybinds them |
+| Numbered (1–9) next-step suggestions | No | New: have `tantra-agent-chat` optionally return structured follow-up suggestions; TUI renders + keybinds them |
 | Cross-client session/portfolio sync | Yes (`SessionStore`, `PortfolioReader` traits) | Confirmed, no change |
 
 Nothing in this doc requires a new crate. It is entirely clarification and confirmation of
-behavior inside crates `0001` and the `vyapaar-agent` superset-capabilities design doc already
-assign: `vyapaar-agent-chat` (turn/event model, personas-as-contributors, effort/thinking params,
-auto-approve preference, follow-up suggestions), `vyapaar-agent-chat-tools` (tool-call grouping
-metadata, source aggregation), and `vyapaar-tui`'s `AgentChat` tab (all the rendering-side
+behavior inside crates `0001` and the `tantra-agent` superset-capabilities design doc already
+assign: `tantra-agent-chat` (turn/event model, personas-as-contributors, effort/thinking params,
+auto-approve preference, follow-up suggestions), `tantra-agent-chat-tools` (tool-call grouping
+metadata, source aggregation), and `tantra-tui`'s `AgentChat` tab (all the rendering-side
 adaptations in §2–§3). Build order is unchanged from 0001 — this doc only sharpens what "build the
 `AgentChat` tab" concretely means once that work starts, which remains gated on the `honba-*`
 migration completing per the superset-capabilities doc's own implementation gate.

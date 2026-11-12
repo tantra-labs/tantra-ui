@@ -1,0 +1,30 @@
+[package]
+name = "tantra-tui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Ratatui terminal workstation for the Tantra platform (multi-tab: Watchlist, Screener, Portfolio, Orders, Backtest, Algos, AgentChat)"
+
+[lib]
+name = "tantra_tui"
+
+[dependencies]
+tantra-core.workspace = true
+tantra-ui-core.workspace = true
+tantra-highlight.workspace = true
+tantra-agent-core.workspace = true
+tantra-agent-chat.workspace = true
+tantra-agent-llm.workspace = true
+tantra-agent-chat-tools.workspace = true
+tokio = { workspace = true, features = ["full"] }
+futures.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+rust_decimal.workspace = true
+ratatui.workspace = true
+crossterm.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

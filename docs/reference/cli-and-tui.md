@@ -1,39 +1,39 @@
-# Vyapaar Workstation: CLI & TUI Slash Commands Reference
+# Tantra Workstation: CLI & TUI Slash Commands Reference
 
 > **Standards Alignment**: Quantcept CLI Specification ([CLI Reference](https://quantcept.io/docs/reference/cli), [Slash Commands](https://quantcept.io/docs/cli/commands))  
-> **Crates**: [`vyapaar-cli`](../../crates/vyapaar-cli), [`vyapaar-tui`](../../crates/vyapaar-tui), [`vyapaar-highlight`](../../crates/vyapaar-highlight)  
-> **Target Platforms**: Linux, macOS, Windows (native binary `vyapaar`)
+> **Crates**: [`tantra-cli`](../../crates/tantra-cli), [`tantra-tui`](../../crates/tantra-tui), [`tantra-highlight`](../../crates/tantra-highlight)  
+> **Target Platforms**: Linux, macOS, Windows (native binary `tantra`)
 
 ---
 
 ## 1. System Overview & Dual Interface Architecture
 
-Vyapaar establishes a dual-layer interface architecture for Indian equities quantitative analysis, risk management, and algorithmic trading:
+Tantra establishes a dual-layer interface architecture for Indian equities quantitative analysis, risk management, and algorithmic trading:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        User Interaction Surface                        │
 ├───────────────────────────────────┬────────────────────────────────────┤
-│           vyapaar-cli             │            vyapaar-tui             │
+│           tantra-cli             │            tantra-tui             │
 │   (Headless Binary Commands)      │    (Interactive Multi-Tab TUI)     │
 │                                   │                                    │
-│  • vyapaar [message] [--continue] │  • Command Palette (/ or Ctrl+P)   │
-│  • vyapaar ask <prompt>           │  • In-Session Slash Commands (40)  │
-│  • vyapaar jobs {add,list,run...} │    - /agent <name|off|default>     │
-│  • vyapaar verify [file]          │    - /undo, /redo, /checkpoints    │
-│  • vyapaar memory {tick,stats...} │    - /export <json|txt>            │
-│  • vyapaar plugin & marketplace   │    - /jobs, /positions, /memory    │
-│  • vyapaar skills & mcp           │    - /theme <dark|light>           │
-│  • vyapaar doctor [--fix]         │    - /perf, /context, /unbind      │
-│  • vyapaar purge [--yes]          │  • Autocomplete & Modal Hotkeys    │
+│  • tantra [message] [--continue] │  • Command Palette (/ or Ctrl+P)   │
+│  • tantra ask <prompt>           │  • In-Session Slash Commands (40)  │
+│  • tantra jobs {add,list,run...} │    - /agent <name|off|default>     │
+│  • tantra verify [file]          │    - /undo, /redo, /checkpoints    │
+│  • tantra memory {tick,stats...} │    - /export <json|txt>            │
+│  • tantra plugin & marketplace   │    - /jobs, /positions, /memory    │
+│  • tantra skills & mcp           │    - /theme <dark|light>           │
+│  • tantra doctor [--fix]         │    - /perf, /context, /unbind      │
+│  • tantra purge [--yes]          │  • Autocomplete & Modal Hotkeys    │
 └─────────────────┬─────────────────┴──────────────────┬─────────────────┘
                   │                                    │
 ┌─────────────────▼────────────────────────────────────▼─────────────────┐
-│               Command Router & Dispatcher (vyapaar-cli)                │
+│               Command Router & Dispatcher (tantra-cli)                │
 └─────────────────┬────────────────────────────────────┬─────────────────┘
                   │                                    │
 ┌─────────────────▼──────────────┐   ┌─────────────────▼─────────────────┐
-│       vyapaar-agent-chat       │   │       vyapaar-agent-core          │
+│       tantra-agent-chat       │   │       tantra-agent-core          │
 │   • Headless Turn Runner       │   │   • Job Scheduler & Approvals     │
 │   • Persona Prompt Injection   │   │   • Local Memory Vector Store     │
 │   • Checkpoint/Undo Engine     │   │   • Strategy Verification Engine  │
@@ -41,8 +41,8 @@ Vyapaar establishes a dual-layer interface architecture for Indian equities quan
 └────────────────────────────────┘   └───────────────────────────────────┘
 ```
 
-1. **Headless CLI Binary (`vyapaar-cli`)**: High-throughput terminal subcommands (`ask`, `jobs`, `verify`, `memory`, `plugin`, `skills`, `mcp`, `doctor`, `purge`) optimized for cron jobs, CI/CD verification pipelines, and scripting.
-2. **Interactive TUI Workstation (`vyapaar-tui`)**: Ratatui terminal workstation featuring 7 core tabs (`Watchlist`, `Screener`, `Portfolio`, `Orders`, `Backtest`, `Algos`, `AgentChat`) and a modal slash command palette accessible via `/` or `Ctrl+P`.
+1. **Headless CLI Binary (`tantra-cli`)**: High-throughput terminal subcommands (`ask`, `jobs`, `verify`, `memory`, `plugin`, `skills`, `mcp`, `doctor`, `purge`) optimized for cron jobs, CI/CD verification pipelines, and scripting.
+2. **Interactive TUI Workstation (`tantra-tui`)**: Ratatui terminal workstation featuring 7 core tabs (`Watchlist`, `Screener`, `Portfolio`, `Orders`, `Backtest`, `Algos`, `AgentChat`) and a modal slash command palette accessible via `/` or `Ctrl+P`.
 
 ---
 
@@ -51,7 +51,7 @@ Vyapaar establishes a dual-layer interface architecture for Indian equities quan
 The global options apply to all subcommands before argument dispatch:
 
 ```bash
-vyapaar [OPTIONS] [COMMAND]
+tantra [OPTIONS] [COMMAND]
 
 Global Options:
   -m, --model-path <PATH>      Path to local GGUF model file (SmolLM2, DeepSeek-R1, etc.)
@@ -69,36 +69,36 @@ Global Options:
 
 ### Log Level Resolution Precedence
 Quantcept requires strict log level resolution before argument processing so flags are not consumed as job goals or prompts:
-1. `VYAPAAR_LOG_LEVEL` or `QUANTCEPT_LOG_LEVEL` environment variable.
+1. `TANTRA_LOG_LEVEL` or `QUANTCEPT_LOG_LEVEL` environment variable.
 2. Explicit CLI flag: `--log-level <debug|info|warn|error|silent>`.
 3. Shorthand flags: `-v` / `--verbose` (`debug`), `-q` / `--quiet` (`silent`).
-4. Local settings file (`~/.vyapaar/settings.json`).
+4. Local settings file (`~/.tantra/settings.json`).
 5. Built-in default: `info`.
 
 ---
 
-## 3. Headless CLI Command Reference (`vyapaar-cli`)
+## 3. Headless CLI Command Reference (`tantra-cli`)
 
 ### 3.1 Terminal Workstation Launch
 ```bash
 # Launch interactive TUI on default Watchlist tab
-vyapaar
+tantra
 
 # Launch interactive TUI directly with an initial question (focuses Agent tab)
-vyapaar "Analyze NIFTY 50 intraday momentum and call-put ratio"
+tantra "Analyze NIFTY 50 intraday momentum and call-put ratio"
 
 # Resume the latest conversation session in this workspace
-vyapaar --continue
-vyapaar -c
+tantra --continue
+tantra -c
 
 # Resume a specific session checkpoint
-vyapaar --resume chk-002
-vyapaar -r chk-002
+tantra --resume chk-002
+tantra -r chk-002
 
 # Auto-approve advisory tool calls for the current process
-vyapaar --skip-permissions
-vyapaar --dangerously-skip-permissions
-vyapaar --yolo
+tantra --skip-permissions
+tantra --dangerously-skip-permissions
+tantra --yolo
 ```
 
 > [!NOTE]
@@ -106,11 +106,11 @@ vyapaar --yolo
 
 ---
 
-### 3.2 Single-Turn Question Answering (`vyapaar ask`)
+### 3.2 Single-Turn Question Answering (`tantra ask`)
 Executes a single conversational or quantitative turn without opening the interactive terminal UI.
 
 ```bash
-vyapaar ask <prompt> [OPTIONS]
+tantra ask <prompt> [OPTIONS]
 
 Options:
   --persona <name>        Specialized financial desk (quant, analyst, trader, etc.)
@@ -138,15 +138,15 @@ Options:
 
 ---
 
-### 3.3 Autonomous Scheduled Jobs (`vyapaar jobs`)
+### 3.3 Autonomous Scheduled Jobs (`tantra jobs`)
 Enables autonomous research, morning briefs, and market scanning without manual supervision.
 
 ```bash
 # Default command lists all jobs
-vyapaar jobs
+tantra jobs
 
 # Add an autonomous scheduled research job
-vyapaar jobs add <goal...> [OPTIONS]
+tantra jobs add <goal...> [OPTIONS]
   Options:
     --schedule <cron|json>      Cron expression (e.g. "30 9 * * 1-5") or schedule JSON
     --max-turns <N>             Turn cap per run (default: 20)
@@ -161,28 +161,28 @@ vyapaar jobs add <goal...> [OPTIONS]
     --once                      Execute immediately once and exit
 
 # List all active and scheduled jobs
-vyapaar jobs list
+tantra jobs list
 
 # Immediately trigger execution of a job by ID
-vyapaar jobs run <id>
+tantra jobs run <id>
 
 # Evaluate cron schedules against current system time (called by systemd/cron)
-vyapaar jobs tick [--all]
+tantra jobs tick [--all]
 
 # Print scheduler integration snippet (systemd timer or crontab)
-vyapaar jobs install
+tantra jobs install
 
 # Display execution logs and tool traces for a job
-vyapaar jobs logs <id>
+tantra jobs logs <id>
 
 # Pause or resume a job
-vyapaar jobs pause <id>
-vyapaar jobs resume <id>
+tantra jobs pause <id>
+tantra jobs resume <id>
 
 # Human-in-the-loop trade approval queue
-vyapaar jobs approvals
-vyapaar jobs approve <id>
-vyapaar jobs deny <id>
+tantra jobs approvals
+tantra jobs approve <id>
+tantra jobs deny <id>
 ```
 
 - `add` generates and prints an **8-character hexadecimal ID** (e.g. `5ecc84e6`).
@@ -191,11 +191,11 @@ vyapaar jobs deny <id>
 
 ---
 
-### 3.4 Strategy Verification (`vyapaar verify`)
+### 3.4 Strategy Verification (`tantra verify`)
 Performs static AST analysis on strategy source files to detect backtest biases and leakage prior to paper or live execution.
 
 ```bash
-vyapaar verify [file] [--strict]
+tantra verify [file] [--strict]
 ```
 
 **Checks Performed**:
@@ -204,7 +204,7 @@ vyapaar verify [file] [--strict]
 2. **Data Leakage Detection**:
    - Detects scaler or indicator fitting prior to train/test split (e.g. `.fit()` called globally without split boundaries).
 3. **SEBI Pre-Trade Compliance**:
-   - Verifies orders route through `vyapaar-risk` sizing and throttle gates.
+   - Verifies orders route through `tantra-risk` sizing and throttle gates.
 
 **Exit Code Contract**:
 - `0`: Verification passed cleanly (no lookahead bias).
@@ -213,68 +213,68 @@ vyapaar verify [file] [--strict]
 
 ---
 
-### 3.5 Local Semantic Memory (`vyapaar memory`)
-Maintains an in-process semantic vector index (`~/.vyapaar/memory.db`) using 384-dimensional embeddings.
+### 3.5 Local Semantic Memory (`tantra memory`)
+Maintains an in-process semantic vector index (`~/.tantra/memory.db`) using 384-dimensional embeddings.
 
 ```bash
 # Default command prints stats
-vyapaar memory
+tantra memory
 
 # Distill recent chat transcripts into semantic memory facts
-vyapaar memory tick
+tantra memory tick
 
 # Display memory index statistics (indexed notes, vector size, disk storage)
-vyapaar memory stats
+tantra memory stats
 
 # Display or configure active embedding model
-vyapaar memory model [name]
+tantra memory model [name]
 
 # Import research documents, PDFs, or Markdown into memory
-vyapaar memory import [path]
+tantra memory import [path]
 
 # Print a 30-minute systemd distillation timer snippet
-vyapaar memory install
+tantra memory install
 ```
 
 ---
 
-### 3.6 Plugins & Marketplace (`vyapaar plugin`)
+### 3.6 Plugins & Marketplace (`tantra plugin`)
 Manages modular tools, extensions, and marketplace feeds:
 
 ```bash
 # List installed plugins
-vyapaar plugin
-vyapaar plugin list
+tantra plugin
+tantra plugin list
 
 # Install, uninstall, enable, or disable plugins
-vyapaar plugin install <name@marketplace|source>
-vyapaar plugin uninstall <name>
-vyapaar plugin enable <name>
-vyapaar plugin disable <name>
+tantra plugin install <name@marketplace|source>
+tantra plugin uninstall <name>
+tantra plugin enable <name>
+tantra plugin disable <name>
 
 # Validate plugin manifest at given path (defaults to current dir; exit 1 on error)
-vyapaar plugin validate [path]
+tantra plugin validate [path]
 
 # Manage marketplace sources
-vyapaar plugin marketplace add <source>
-vyapaar plugin marketplace list
-vyapaar plugin marketplace remove <name>
-vyapaar plugin marketplace update [name]
+tantra plugin marketplace add <source>
+tantra plugin marketplace list
+tantra plugin marketplace remove <name>
+tantra plugin marketplace update [name]
 ```
 
 ---
 
-### 3.7 Financial Skills Suites (`vyapaar skills`)
+### 3.7 Financial Skills Suites (`tantra skills`)
 Lists bundled specialized quantitative and trading skills:
 
 ```bash
-vyapaar skills
-vyapaar skills list
-vyapaar skills show <name>
+tantra skills
+tantra skills list
+tantra skills show <name>
 ```
 
 **The 8 Bundled Desks**:
-- `vyapaar-ai`: The all-round coordinator.
+- `tantra-ai`: The all-round coordinator.
 - `quant`: Statistical factor models, backtesting, empirical validation.
 - `analyst`: Fundamental research, financial statement analysis, earnings quality.
 - `trader`: Price action, intraday support/resistance, order flow execution.
@@ -286,44 +286,44 @@ vyapaar skills show <name>
 
 ---
 
-### 3.8 Model Context Protocol (`vyapaar mcp`)
+### 3.8 Model Context Protocol (`tantra mcp`)
 Connects external MCP server tools into the workstation:
 
 ```bash
-vyapaar mcp
-vyapaar mcp list
-vyapaar mcp connect <name> <command>
+tantra mcp
+tantra mcp list
+tantra mcp connect <name> <command>
 ```
 
 ---
 
-### 3.9 Diagnostics & Auto-Repair (`vyapaar doctor`)
+### 3.9 Diagnostics & Auto-Repair (`tantra doctor`)
 Verifies workstation environment health, Lakehouse storage paths, and sidecars:
 
 ```bash
-vyapaar doctor
-vyapaar doctor --fix
-vyapaar doctor --json
+tantra doctor
+tantra doctor --fix
+tantra doctor --json
 ```
 
-- `--fix`: Automatically provisions missing directories (`~/.vyapaar/lakehouse`, `~/.vyapaar/cache`) and SQLite tables.
+- `--fix`: Automatically provisions missing directories (`~/.tantra/lakehouse`, `~/.tantra/cache`) and SQLite tables.
 - `--json`: Emits machine-readable health diagnostics.
 
 ---
 
-### 3.10 State Purge (`vyapaar purge`)
+### 3.10 State Purge (`tantra purge`)
 Removes ephemeral cache files, session transcripts, and temporary data.
 
 ```bash
 # Preview files to be deleted without removing
-vyapaar purge --dry-run
+tantra purge --dry-run
 
 # Confirm permanent non-interactive cleanup
-vyapaar purge --yes
+tantra purge --yes
 ```
 
 > [!CAUTION]
-> `vyapaar purge` deletes `~/.vyapaar/cache`, `~/.vyapaar/tmp`, and `~/.learnings`. It strictly refuses to execute without `--yes` or `--dry-run`. It never deletes strategy source files, ledger entries, or user configuration.
+> `tantra purge` deletes `~/.tantra/cache`, `~/.tantra/tmp`, and `~/.learnings`. It strictly refuses to execute without `--yes` or `--dry-run`. It never deletes strategy source files, ledger entries, or user configuration.
 
 ---
 
@@ -337,9 +337,9 @@ vyapaar purge --yes
 
 ---
 
-## 4. Interactive TUI Slash Command Palette (`vyapaar-tui`)
+## 4. Interactive TUI Slash Command Palette (`tantra-tui`)
 
-Within `vyapaar-tui`, pressing `/` anywhere or `Ctrl+P` opens the **Command Palette**.
+Within `tantra-tui`, pressing `/` anywhere or `Ctrl+P` opens the **Command Palette**.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -374,7 +374,7 @@ Within `vyapaar-tui`, pressing `/` anywhere or `Ctrl+P` opens the **Command Pale
 | **`/resume`** | `[session_id]` | Global | Resumes session or opens interactive session history picker. |
 | **`/clear`** | None | Session | Clears visual scrollback history from the active terminal buffer. |
 | **`/copy`** | `[full\|tools]` | Session | Copies latest answer, full turn transcript, or tool outputs to clipboard. |
-| **`/export`** | `<json\|txt>` | Session | Exports session transcript to `~/Downloads/vyapaar/`. |
+| **`/export`** | `<json\|txt>` | Session | Exports session transcript to `~/Downloads/tantra/`. |
 | **`/undo`** | None | Session | Reverts the last conversation turn, removing it from context. |
 | **`/redo`** | None | Session | Restores a previously undone conversation turn. |
 | **`/checkpoints`** | None | Session | Lists and restores saved turn checkpoints within the session. |
@@ -428,8 +428,8 @@ Inside interactive modals, the following single-key bindings are supported:
 The complete test suite runs under `cargo test`:
 
 ```bash
-cargo test -p vyapaar-cli -p vyapaar-tui
+cargo test -p tantra-cli -p tantra-tui
 ```
 
-- **`vyapaar-cli` test suite (23 tests)**: Validates roundtrip CLI argument parsing, environment variable precedence, JSON formatting, lookahead bias exit codes, and jobs lifecycle.
-- **`vyapaar-tui` test suite (17 tests)**: Validates tab navigation, keybindings, command palette fuzzy filtering, Tab autocompletion, `/` shortcut activation, and all 40 slash command executions.
+- **`tantra-cli` test suite (23 tests)**: Validates roundtrip CLI argument parsing, environment variable precedence, JSON formatting, lookahead bias exit codes, and jobs lifecycle.
+- **`tantra-tui` test suite (17 tests)**: Validates tab navigation, keybindings, command palette fuzzy filtering, Tab autocompletion, `/` shortcut activation, and all 40 slash command executions.

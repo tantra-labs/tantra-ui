@@ -1,0 +1,22 @@
+[package]
+name = "tantra-ui-assets"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Branding, themes, fonts, fixtures, and audio profiles for the Tantra workstation"
+
+[lib]
+name = "tantra_ui_assets"
+
+[dependencies]
+tantra-core.workspace = true
+tantra-ui-core.workspace = true
+serde.workspace = true
+rust_decimal.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

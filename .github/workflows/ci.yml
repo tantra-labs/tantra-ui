@@ -25,7 +25,7 @@ jobs:
         run: cargo test --workspace
 
   wasm:
-    name: WASM check (vyapaar-ui-app)
+    name: WASM check (tantra-ui-app)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Check WASM target
-        run: cargo check -p vyapaar-ui-app --target wasm32-unknown-unknown
+        run: cargo check -p tantra-ui-app --target wasm32-unknown-unknown
 
   hygiene:
     name: Test-directory hygiene
