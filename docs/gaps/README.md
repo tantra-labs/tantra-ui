@@ -11,6 +11,7 @@ Every gap filed in this repo, newest last. See
 | [0004](0004-ui-app-has-no-view-layer.md) | `tantra-ui-app` has feature-state models but no Leptos/CSR view layer | `tantra-ui-app` |
 | [0005](0005-tui-placeholder-tabs-and-hardcoded-watchlist.md) | TUI Watchlist tab renders hardcoded rows; Screener/Portfolio/Orders are placeholder panels | `tantra-tui` ui |
 | [0006](0006-cli-scan-fixture-universe.md) | CLI `scan` runs against an in-memory 4-scrip fixture universe instead of a live `GET /screener/scan` | `tantra-cli` scan |
+| [0007](0007-chart-level-and-annotation-primitives.md) | Charts lack level-line / zone-band / marker / entry-SL-TSL line primitives (EE+ Strategy Studio) | `tantra-ui-charts` |
 
 ## Closed
 
