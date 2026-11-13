@@ -1,11 +1,11 @@
 # 0001 — Building `tantra-cli` / `tantra-tui` / `tantra-highlight` from the `artha` design work
 
-> **Status**: implemented — crate build-out complete and verified (`cargo check --workspace --profile prod` green, `cargo test --workspace --profile prod` 275 passed, clippy/fmt clean).
-> **What was built**: `tantra-highlight` (zero-I/O `Language`/`HighlightSpan`/`highlight_code` lexer), `tantra-tui` (`TuiApp`, `ActiveTab{Screener,Portfolio,Orders,AgentChat}`, `run_terminal` crossterm event loop), `tantra-cli` (`CliArgs`/`Command` dispatch + `run` runner; Ask/Chat/Tui/Health wired; Jobs/Strategy/Verify/etc. implemented).
+> **Status**: implemented — crate build-out complete and verified (`cargo check --workspace --profile prod` green, `cargo test --workspace --profile prod` 276 passed, clippy/fmt clean).
+> **What was built**: `tantra-highlight` (zero-I/O `Language`/`HighlightSpan`/`highlight_code` lexer), `tantra-tui` (`TuiApp`, 7-tab `ActiveTab`, `run_terminal` crossterm event loop wired to real LLM `chat_stream` providers), `tantra-cli` (`CliArgs`/`Command` dispatch + `run` runner; Ask/Chat/Tui/Health wired, plus later Jobs/Serve/Strategy/Verify).
 > **Residual, tracked separately**: CLI `scan` is wired to the canonical screener
 > (`crates/tantra-cli/src/scan.rs`, `CommandOutcome::ScanResults`); gap `0001`
-> closed (gap doc removed). Real `AgentChat`/`Ask` wiring to `tantra-agent` is
-> blocked upstream on the `tantra-agent` port landing.
+> closed (gap doc removed). The canned-report commands (`memory`/`plugin`/`skills`/
+> `mcp`/`doctor`/`purge`/`health`) are open gap 0003; the fixture-universe scan is open gap 0006.
 > **Depends on reading**: `tantra-ui/docs/migration-guide.md`, `tantra-agent/docs/migration-guide.md`,
 > `tantra-market/docs/migration-guide.md`, `tantra-runtime/docs/migration-guide.md`, and the
 > `artha` workspace referenced throughout this doc.

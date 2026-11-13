@@ -1,10 +1,11 @@
 # `tantra-ui` — Inter-Agent Handoff (Layer 5)
 
-> Updated: 2026-11-10 — added `tantra serve` (no server binary existed anywhere in the
-> workspace before this). PLAN-0001 Stage 4 (CLI & agent jobs unification) complete;
-> `docs/plans` and `docs/gaps` reconciled against the green tree (plan `0001` moved to
-> Implemented; gaps `0001` and `0002` CLOSED). Alongside the earlier Layer 5 / Tier 5
-> work below.
+> Updated: 2026-11-13 — docs batch: former `docs/roadmap/roadmap.md` dismantled into
+> `docs/design/` (`architecture.md` rewritten source-verified + `implementation-record.md` +
+> per-crate `code-*.md` for all 9 crates + `code-migration-map.md`), `docs/gaps/` gained four
+> source-verified open gaps (0003–0006), `docs/plans/README.md` corrected (plan 0005 SHAs
+> rewritten out of history; plan 0001 "blocked upstream" claim stale — Ask/Chat/Tui wired).
+> No Rust code touched. TUI `run()` event loop is DONE (`terminal.rs`).
 
 ## 1. Phase / Slice Status
 - **PLAN-0001 STAGE 4 COMPLETE** (`tantra-runtime/docs/plans/0001`, CLI half —
@@ -74,13 +75,14 @@
   `tantra-runtime/docs/gaps/0004`.
 
 ## 3. Immediate Next Steps
-1. Leptos view layer for `tantra-ui-app` (feature state models are done; no CSR
-   rendering yet).
-2. TUI `run()` event loop (crossterm `event::read` + `TuiApp::on_key`).
-3. Optional: replace `scan` fixture universe with a live
-   `tantra-runtime-api-rest` `GET /screener/scan` response.
-4. Optional: replace backtest `base_ts`/`generate_market_bars` fixture with real
-   fill events for live parity.
+1. Leptos/CSR view layer for `tantra-ui-app` (feature state models are done; no CSR
+   rendering yet) — open gap 0004.
+2. Wire TUI placeholder tabs (Screener/Portfolio/Orders panels, hardcoded Watchlist rows) to
+   live data — open gap 0005.
+3. Replace the `scan` fixture universe with a live `tantra-runtime-api-rest`
+   `GET /screener/scan` response — open gap 0006.
+4. Wire the canned CLI commands (`memory`/`plugin`/`skills`/`mcp`/`doctor`/`purge`/`health`) —
+   open gap 0003, mostly blocked on `tantra-agent` capabilities.
 
 ## 4. Operating Invariants
 - Zero `#[cfg(test)]` / `#[cfg(test)] mod tests` inside `crates/*/src/`.
