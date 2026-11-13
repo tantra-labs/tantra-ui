@@ -8,8 +8,8 @@ use rust_decimal::Decimal;
 use tantra_agent_llm::ScriptedFakeLlm;
 use tantra_cli::args::{
     AskArgs, ChatArgs, Cli, CliArgs, CliCommand, Command, DoctorArgs, JobsArgs, LogLevel,
-    MarketplaceArgs, McpArgs, MemoryArgs, OutputFormat, PluginArgs, PurgeArgs, ScanArgs,
-    ServeArgs, SkillsArgs, VerifyArgs, resolve_log_level,
+    MarketplaceArgs, McpArgs, MemoryArgs, OutputFormat, PluginArgs, PurgeArgs, ScanArgs, ServeArgs,
+    SkillsArgs, VerifyArgs, resolve_log_level,
 };
 use tantra_cli::runner::{CliError, CommandOutcome, run, run_jobs_with_home, run_with_provider};
 use tantra_cli::scan::{parse_query, scan_universe};
@@ -349,7 +349,10 @@ fn scan_apply_matching_rows() {
     let resp = tantra_ui_api_wasm::screener::apply_scan(&scan_universe(), &req).unwrap();
     assert_eq!(resp.rows.len(), 1);
     assert_eq!(resp.rows[0].instrument.symbol, "HDFCBANK");
-    assert_eq!(resp.rows[0].instrument.exchange, tantra_core::types::Exchange::Nse);
+    assert_eq!(
+        resp.rows[0].instrument.exchange,
+        tantra_core::types::Exchange::Nse
+    );
 }
 
 #[test]

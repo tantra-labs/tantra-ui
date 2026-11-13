@@ -226,10 +226,50 @@ pub fn render_suggestion_card(sugg: &TradeSuggestion) -> String {
         .join(", ");
 
     let val_section = if let Some(ref val) = sugg.optimization.validation {
-        let wf_str = val.walk_forward.as_ref().map(|w| format!("WFE: {:.1}% ({})", (w.wfe * Decimal::new(100, 0)).round_dp(1), if w.passed { "PASS" } else { "FAIL" })).unwrap_or_else(|| "N/A".to_string());
-        let hold_str = val.holdout.as_ref().map(|h| format!("Holdout Ret: {:.1}% ({})", (h.retention_ratio * Decimal::new(100, 0)).round_dp(1), if h.passed { "PASS" } else { "FAIL" })).unwrap_or_else(|| "N/A".to_string());
-        let mc_str = val.monte_carlo.as_ref().map(|m| format!("MC DD95: {:.1}% ({})", (m.drawdown_95 * Decimal::new(100, 0)).round_dp(1), if m.passed { "PASS" } else { "FAIL" })).unwrap_or_else(|| "N/A".to_string());
-        let cost_str = val.cost_stress.as_ref().map(|c| format!("2x Sharpe: {:.2} ({})", c.stress_2x_sharpe, if c.passed { "PASS" } else { "FAIL" })).unwrap_or_else(|| "N/A".to_string());
+        let wf_str = val
+            .walk_forward
+            .as_ref()
+            .map(|w| {
+                format!(
+                    "WFE: {:.1}% ({})",
+                    (w.wfe * Decimal::new(100, 0)).round_dp(1),
+                    if w.passed { "PASS" } else { "FAIL" }
+                )
+            })
+            .unwrap_or_else(|| "N/A".to_string());
+        let hold_str = val
+            .holdout
+            .as_ref()
+            .map(|h| {
+                format!(
+                    "Holdout Ret: {:.1}% ({})",
+                    (h.retention_ratio * Decimal::new(100, 0)).round_dp(1),
+                    if h.passed { "PASS" } else { "FAIL" }
+                )
+            })
+            .unwrap_or_else(|| "N/A".to_string());
+        let mc_str = val
+            .monte_carlo
+            .as_ref()
+            .map(|m| {
+                format!(
+                    "MC DD95: {:.1}% ({})",
+                    (m.drawdown_95 * Decimal::new(100, 0)).round_dp(1),
+                    if m.passed { "PASS" } else { "FAIL" }
+                )
+            })
+            .unwrap_or_else(|| "N/A".to_string());
+        let cost_str = val
+            .cost_stress
+            .as_ref()
+            .map(|c| {
+                format!(
+                    "2x Sharpe: {:.2} ({})",
+                    c.stress_2x_sharpe,
+                    if c.passed { "PASS" } else { "FAIL" }
+                )
+            })
+            .unwrap_or_else(|| "N/A".to_string());
         format!(
             "4. SIX-GATE OVERFITTING AUDIT BLOCK (GAP-0002)
    ────────────────────────────────────────────────────────────────────────
@@ -239,7 +279,11 @@ pub fn render_suggestion_card(sugg: &TradeSuggestion) -> String {
    • Monte Carlo Tail : {}
    • Cost-Stress (2x) : {}
 ",
-            if val.passed { "PASSED (All 6 Gates Clean)" } else { "FAILED / WARNINGS PRESENT" },
+            if val.passed {
+                "PASSED (All 6 Gates Clean)"
+            } else {
+                "FAILED / WARNINGS PRESENT"
+            },
             wf_str,
             hold_str,
             mc_str,

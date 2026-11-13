@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
+  "crates/tantra-ui",
   "crates/tantra-ui-app",
   "crates/tantra-ui-core",
   "crates/tantra-ui-client",
@@ -22,6 +23,8 @@ repository = "https://github.com/tantra-labs/tantra-ui"
 [workspace.dependencies]
 # Tantra internal crates
 tantra-core = { path = "../tantra-core" }
+# Facade of this workspace (repo-named convention, root plan 0003 Phase 4).
+tantra-ui = { path = "crates/tantra-ui" }
 # Agent-chat wiring (from upstream) kept for CLI/TUI integration with the
 # tantra-agent workspace.
 tantra-agent-core = { path = "../tantra-agent/crates/tantra-agent-core" }

@@ -401,7 +401,9 @@ fn test_algos_tab_state_and_render() {
     assert_eq!(new_status, initial_status.toggle());
 
     // Render frame
-    terminal.draw(|frame| tantra_tui::ui::draw(frame, &app)).unwrap();
+    terminal
+        .draw(|frame| tantra_tui::ui::draw(frame, &app))
+        .unwrap();
     let buffer = terminal.backend().buffer();
     let content: String = buffer.content().iter().map(|c| c.symbol()).collect();
     assert!(content.contains("Registered Algorithms"));
@@ -420,7 +422,9 @@ fn test_backtest_tab_render_and_quadrants() {
     assert!(!app.backtest_equity_curve.is_empty());
     assert!(app.trade_suggestion.is_some());
 
-    terminal.draw(|frame| tantra_tui::ui::draw(frame, &app)).unwrap();
+    terminal
+        .draw(|frame| tantra_tui::ui::draw(frame, &app))
+        .unwrap();
     let buffer = terminal.backend().buffer();
     let content: String = buffer.content().iter().map(|c| c.symbol()).collect();
     assert!(content.contains("Key Performance Indicators"));

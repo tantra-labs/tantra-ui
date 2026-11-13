@@ -24,8 +24,8 @@ pub use fonts::{
     FAMILY_SILKSCREEN, FAMILY_SOURCE_SANS_3, FONTS_CSS, FontFamily, FontStack, FontWeight,
     mono_stack, sans_stack,
 };
-pub use themes::{Color, Theme, ThemeId};
 pub use tantra_core::rust_decimal;
+pub use themes::{Color, Theme, ThemeId};
 
 /// CSS component stylesheet shipped with the workspace (`assets/style/`).
 pub const COMPONENTS_CSS: &str = include_str!("../assets/style/components.css");

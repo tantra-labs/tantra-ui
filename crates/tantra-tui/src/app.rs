@@ -11,7 +11,6 @@ use tantra_ui_core::strategy::{
 use crate::agent_chat::{AgentMessage, AgentRole, ChatTranscript};
 use crate::keybindings::{Action, handle_key};
 
-
 /// The workstation tabs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -107,7 +106,6 @@ pub const SLASH_COMMANDS: &[(&str, &str)] = &[
         "/suggest",
         "Generate optimal trade suggestion for active instrument (/suggest [strategy])",
     ),
-
     (
         "/help",
         "List available slash commands and shortcuts (/help [command])",
@@ -422,24 +420,27 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
                     "Switched to Algos & Strategy Management tab.",
                 ));
             }
-            "/backtest" => {
-                match self.run_backtest_for_strategy(arg) {
-                    Ok(msg) => self.chat.push(AgentMessage::new(AgentRole::System, msg)),
-                    Err(err) => self.chat.push(AgentMessage::new(AgentRole::System, format!("Backtest error: {err}"))),
-                }
-            }
-            "/tune" => {
-                match self.tune_for_strategy(arg) {
-                    Ok(msg) => self.chat.push(AgentMessage::new(AgentRole::System, msg)),
-                    Err(err) => self.chat.push(AgentMessage::new(AgentRole::System, format!("Tuning error: {err}"))),
-                }
-            }
-            "/suggest" => {
-                match self.suggest_for_strategy(arg) {
-                    Ok(msg) => self.chat.push(AgentMessage::new(AgentRole::System, msg)),
-                    Err(err) => self.chat.push(AgentMessage::new(AgentRole::System, format!("Trade suggestion error: {err}"))),
-                }
-            }
+            "/backtest" => match self.run_backtest_for_strategy(arg) {
+                Ok(msg) => self.chat.push(AgentMessage::new(AgentRole::System, msg)),
+                Err(err) => self.chat.push(AgentMessage::new(
+                    AgentRole::System,
+                    format!("Backtest error: {err}"),
+                )),
+            },
+            "/tune" => match self.tune_for_strategy(arg) {
+                Ok(msg) => self.chat.push(AgentMessage::new(AgentRole::System, msg)),
+                Err(err) => self.chat.push(AgentMessage::new(
+                    AgentRole::System,
+                    format!("Tuning error: {err}"),
+                )),
+            },
+            "/suggest" => match self.suggest_for_strategy(arg) {
+                Ok(msg) => self.chat.push(AgentMessage::new(AgentRole::System, msg)),
+                Err(err) => self.chat.push(AgentMessage::new(
+                    AgentRole::System,
+                    format!("Trade suggestion error: {err}"),
+                )),
+            },
             "/help" => {
                 if !arg.is_empty() {
                     let search = if arg.starts_with('/') {
@@ -1092,7 +1093,11 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
         let (report, curve) =
             StrategyBridge::run_backtest_with_curve(&name, &symbol, None, capital)?;
 
-        let pnl_sign = if report.net_pnl >= Decimal::ZERO { "+" } else { "" };
+        let pnl_sign = if report.net_pnl >= Decimal::ZERO {
+            "+"
+        } else {
+            ""
+        };
         let msg = format!(
             "Executed backtest for '{name}' on {symbol}: Net PnL {pnl_sign}₹{:.2} ({:+.2}%), Sharpe {:.2}, Max DD {:.2}%.",
             report.net_pnl, report.total_return_pct, report.sharpe_ratio, report.max_drawdown_pct

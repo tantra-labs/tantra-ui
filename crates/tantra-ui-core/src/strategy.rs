@@ -4,9 +4,9 @@
 //! everywhere), no threads, no tokio, no blocking I/O. Used across CLI, TUI,
 //! and Leptos workstations.
 
-use std::path::{Path, PathBuf};
 #[cfg(not(target_arch = "wasm32"))]
 use std::fs;
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Duration, Utc};
 use rust_decimal::Decimal;
@@ -851,11 +851,11 @@ impl StrategyBridge {
         }
 
         let bars = Self::generate_market_bars(symbol, 120);
-        let (sim_result, curve) = Self::simulate_strategy_with_curve(&strategy.id, &effective_params, &bars, capital);
+        let (sim_result, curve) =
+            Self::simulate_strategy_with_curve(&strategy.id, &effective_params, &bars, capital);
 
         Ok((sim_result, curve))
     }
-
 
     /// Tune strategy parameters across their search ranges using a deterministic grid sweep.
     pub fn tune_strategy(
@@ -1320,14 +1320,7 @@ impl StrategyBridge {
         bars: &[MarketBar],
         capital: Decimal,
     ) -> (BacktestReport, Vec<u64>) {
-        let report = Self::simulate_strategy(
-            strategy_id,
-            "",
-            params,
-            bars,
-            capital,
-            Utc::now(),
-        );
+        let report = Self::simulate_strategy(strategy_id, "", params, bars, capital, Utc::now());
         // Build a realistic curve matching report net pnl and drawdown
         let count = bars.len();
         let mut curve = Vec::with_capacity(count);
@@ -1397,16 +1390,16 @@ impl StrategyBridge {
                         .unwrap_or(close);
                     close > max_high
                 }
-                "rsi_reversal" => bars[i].close > bars[i].open && bars[i - 1].close <= bars[i - 1].open,
+                "rsi_reversal" => {
+                    bars[i].close > bars[i].open && bars[i - 1].close <= bars[i - 1].open
+                }
                 "sma_crossover" => {
                     let fast_slice = &bars[i - fast_period..=i];
                     let slow_slice = &bars[i - slow_period..=i];
-                    let fast_ma: Decimal =
-                        fast_slice.iter().map(|b| b.close).sum::<Decimal>()
-                            / Decimal::from(fast_slice.len());
-                    let slow_ma: Decimal =
-                        slow_slice.iter().map(|b| b.close).sum::<Decimal>()
-                            / Decimal::from(slow_slice.len());
+                    let fast_ma: Decimal = fast_slice.iter().map(|b| b.close).sum::<Decimal>()
+                        / Decimal::from(fast_slice.len());
+                    let slow_ma: Decimal = slow_slice.iter().map(|b| b.close).sum::<Decimal>()
+                        / Decimal::from(slow_slice.len());
                     fast_ma > slow_ma
                 }
                 _ => true,
@@ -1430,7 +1423,6 @@ impl StrategyBridge {
 
         returns
     }
-
 }
 
 /// A market candle bar.

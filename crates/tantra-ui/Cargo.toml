@@ -1,0 +1,19 @@
+[package]
+name = "tantra-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Facade of the tantra-ui bounded context (Face): re-exports the member crates"
+
+[dependencies]
+tantra-ui-app = { workspace = true }
+tantra-ui-core = { workspace = true }
+tantra-ui-client = { workspace = true }
+tantra-ui-api-wasm = { workspace = true }
+tantra-ui-assets = { workspace = true }
+tantra-ui-charts = { workspace = true }
+tantra-cli = { workspace = true }
+tantra-tui = { workspace = true }
+tantra-highlight = { workspace = true }
