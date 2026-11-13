@@ -12,35 +12,40 @@
 
 Add an **Elephant Edge Strategy Studio** to the web workstation (and a compact
 TUI/CLI readout): a visual workspace where a trader sees the day's full level
-map, the strategy's live signals with their SL/TSL lines, and the proposed
-positioning — with the same 1:1 wire types the Python strategy and Rust REST
-API already emit (`tantra-core` plan 0003).
+map, the strategy's live signals with their SL/TSL and 3R/5R target lines, and
+the proposed positioning — with the same 1:1 wire types the Python strategy and
+Rust REST API already emit (`tantra-core` plan 0003).
 
 ## 1. Screens
 
 ### 1.1 Level-Map Canvas (`tantra-ui-app` + `tantra-ui-charts`)
-- **Session anchor**: the first 1-minute candle (09:15) highlighted; its
-  open/high/low drawn as reference lines.
-- **Elephant zones**: the two support + two resistance percentile bands drawn
-  as shaded **zones** (not lines), re-colored by confluence score (0–4).
-- **Overlays**: OI walls (top-2 CE/PE) as vertical markers, gamma-flip line,
-  max-pain strike, PDH/PDL/PDC, round-number strike lines, and **Order Block**
-  boxes (bullish OB below / bearish OB above).
-- **Regime badge**: long-gamma (pin/mean-revert) vs short-gamma
-  (trend/breakout) chip from the gamma flip vs spot.
+- **Session anchor**: the first 1-minute candle (09:15–09:16 IST) highlighted;
+  its open/high/low/close drawn as reference lines.
+- **Elephant zones**: the two support ($S_1, S_2$) + two resistance ($R_1, R_2$)
+  bands drawn as shaded **zones** (not lines), re-colored by confluence score
+  (0–4) and annotated with snapped OI strike walls where applicable.
+- **Overlays**: OI walls (top-2 CE/PE) with $\Delta\text{OI}$ building vs
+  short-covering badges, gamma-flip line, max-pain strike, PDH/PDL/PDC,
+  round-number strike lines, **Order Block** boxes (bullish OB below / bearish
+  OB above), and **Elephant Bar** markers on expansion candles.
+- **Regime & Cycle badge**: long-gamma (pin/mean-revert) vs short-gamma
+  (trend/breakout) chip from the gamma flip vs spot, Local Range PCR readout,
+  and a **Mid-Month Cycle (15th $\pm$ 1d) Reversal Alert** badge when the
+  session falls inside the 14th–16th window with a stretched 2-week trend.
 
 ### 1.2 Signals & Stop Panel
 - Signal markers (Buy/Sell, kind = Breakout/Reversal/Retest) at the level
-  where the trigger candle confirmed; entry line, **initial SL line**, and
-  **trailing stop line** drawn and updated as `StopUpdate`s arrive (WS/SSE
-  from `tantra-runtime-api-rest`).
+  where the trigger candle confirmed; entry line, **initial SL line ($1R$)**,
+  **$3R$ primary target / $4R\text{--}5R$ runner target lines**, and **trailing
+  stop line** drawn and updated as `StopUpdate`s arrive (WS/SSE from
+  `tantra-runtime-api-rest`).
 - Per-signal card: `ref_levels`, confluence score, confidence, risk/R:R vs the
-  IV-implied expected move.
+  IV-implied expected move, and the **6-candle stagnation time-stop** countdown.
 
 ### 1.3 Positioning Table
 - `PositionIntent` rows: instrument, side, suggested quantity (whole lots),
-  risk ₹, SL distance, max-position-fraction utilisation, per-day trade count;
-  square-off countdown to 15:10.
+  risk ₹, SL distance, max-position-fraction utilisation, per-day trade count,
+  6-candle hold counter, and square-off countdown to 15:10.
 - Same table rendered in `tantra-tui` (Positioning tab) and as a `tantra-cli`
   `elephant` report command (mirroring the canned-report gap 0003 cleanup).
 
@@ -61,7 +66,7 @@ API already emit (`tantra-core` plan 0003).
   renderers + annotations in `tantra-ui-charts`, unit-tested geometry.
 - **Phase 2**: level-map canvas + regime badge on seeded data (gap 0004 view
   layer work — ui-app grows its first real views).
-- **Phase 3**: signals + stop lines + positioning table, live-wired.
+- **Phase 3**: signals + stop/target lines + positioning table, live-wired.
 - **Phase 4**: TUI Positioning tab + CLI `elephant` report; docs (root T12).
 
 ## 4. Quality Gates
