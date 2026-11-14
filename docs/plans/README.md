@@ -12,6 +12,7 @@ Per workspace rule `.agents/rules/gap-tracking.md`:
 | [0002](0002-quantcept-web-ux-reference.md) | UX reference for the `AgentChat` tab, captured from a live product session | `tantra-ui` | Live product UX reference |
 | [0003](0003-mcp-gateway-result-rendering-and-client-configs.md) | MCP Gateway UI/CLI Integration, Result Block Rendering, and Client Configs | `tantra-cli`, `tantra-tui` | Ready for implementation |
 | [0006](0006-elephant-edge-strategy-studio.md) | Elephant Edge (EE+) Strategy Studio — level map, signals + SL/TSL lines, positioning table (web/TUI/CLI) | `tantra-ui-app`, `tantra-tui`, `tantra-cli`, `tantra-ui-charts` | Proposed — tracks gap 0007; master plan root `docs/plans/0005` |
+| [0007](0007-agent-desk-ui-wiring-and-winning-trade-flow.md) | Agent Desk UI Wiring & Winning-Trade Flow — 14-persona roster + lenses across CLI/TUI/web, and the risk-gated screen → desk → trade-plan → place → monitor → journal journey | `tantra-cli`, `tantra-tui`, `tantra-ui-app` | Proposed — docs/design/plan only; depends on `tantra-agent` plan 0012 (persona roster) and plan 0003 (result blocks) |
 
 ## Implemented Plans
 

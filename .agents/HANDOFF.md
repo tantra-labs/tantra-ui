@@ -6,6 +6,12 @@
 > source-verified open gaps (0003–0006), `docs/plans/README.md` corrected (plan 0005 SHAs
 > rewritten out of history; plan 0001 "blocked upstream" claim stale — Ask/Chat/Tui wired).
 > No Rust code touched. TUI `run()` event loop is DONE (`terminal.rs`).
+>
+> 2026-11-13 (second batch): new **plan 0007** + design doc for the **Agent Desk UI Wiring &
+> Winning-Trade Flow** — 14-persona roster + lenses (`--persona`/`/agent` + new `--lens`/`/lens`/
+> `/desk`/`/trade`) across CLI/TUI/web, and the risk-gated screen → desk → trade-plan → place →
+> monitor → journal journey. Docs/design/plan only; depends on `tantra-agent` plan 0012 (persona
+> roster) and plan 0003 (result blocks).
 
 ## 1. Phase / Slice Status
 - **PLAN-0001 STAGE 4 COMPLETE** (`tantra-runtime/docs/plans/0001`, CLI half —
