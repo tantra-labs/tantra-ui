@@ -10,11 +10,13 @@ use tantra_agent_llm::{
     CandleGgufConfig, CandleGgufProvider, ChatMessage, ChatRequest, ChatStreamEvent, ENV_GGUF_PATH,
     LlmProvider,
 };
+use tantra_agent_mcp::McpServer;
+use tantra_agent_mcp::frontier::ManifestGenerator;
 
 use crate::args::{
     ApprovalPolicyArg, AskArgs, ChatArgs, CliArgs, Command, DoctorArgs, JobsArgs, MarketplaceArgs,
     McpArgs, MemoryArgs, MissedPolicy, OutputFormat, PluginArgs, PurgeArgs, ScanArgs, ServeArgs,
-    SkillsArgs, StrategyArgs, VerifyArgs,
+    SkillsArgs, StrategyArgs, ToolsArgs, VerifyArgs,
 };
 use crate::jobs_runtime::{AddRequest, JobsRuntime, short_id, summarize_receipt};
 use crate::scan;
@@ -79,6 +81,8 @@ pub enum CommandOutcome {
     SkillsSuccess(String),
     /// An `mcp` command produced an outcome message.
     McpSuccess(String),
+    /// A `tools` command produced an outcome message.
+    ToolsSuccess(String),
     /// A `doctor` run produced an environment report.
     DoctorReport(String),
     /// A `purge` run produced a cleanup summary.
@@ -194,6 +198,7 @@ pub fn run_with_provider(
         Command::Plugin(args) => run_plugin(args),
         Command::Skills(args) => run_skills(args),
         Command::Mcp(args) => run_mcp(args),
+        Command::Tools(args) => run_tools(args),
         Command::Doctor(args) => run_doctor(args),
         Command::Purge(args) => run_purge(args),
         Command::Health => run_health(),
@@ -1385,7 +1390,7 @@ pub fn run_skills_with_home(args: &SkillsArgs, home: &Path) -> Result<CommandOut
     }
 }
 
-fn run_mcp(args: &McpArgs) -> Result<CommandOutcome, CliError> {
+pub fn run_mcp(args: &McpArgs) -> Result<CommandOutcome, CliError> {
     run_mcp_with_home(args, &tantra_home_dir())
 }
 
@@ -1423,6 +1428,104 @@ pub fn run_mcp_with_home(args: &McpArgs, home: &Path) -> Result<CommandOutcome, 
             Ok(CommandOutcome::McpSuccess(format!(
                 "Connected MCP server '{name}' via command: {command}"
             )))
+        }
+        McpArgs::Config { client } => match client.as_str() {
+            "claude-code" => {
+                let config =
+                    ManifestGenerator::generate_claude_desktop("tantra", &["mcp", "--stdio"]);
+                Ok(CommandOutcome::McpSuccess(
+                    serde_json::to_string_pretty(&config).unwrap_or_default(),
+                ))
+            }
+            "cursor" => {
+                let config =
+                    ManifestGenerator::generate_cursor("tantra", &["mcp", "--stdio"], None);
+                Ok(CommandOutcome::McpSuccess(
+                    serde_json::to_string_pretty(&config).unwrap_or_default(),
+                ))
+            }
+            "vscode" => {
+                // VS Code Copilot Agent mode uses `.vscode/mcp.json` (plan 0003
+                // §2.3); the config shape matches the Cursor one, prefixed with
+                // a header comment.
+                let config =
+                    ManifestGenerator::generate_cursor("tantra", &["mcp", "--stdio"], None);
+                let json = serde_json::to_string_pretty(&config).unwrap_or_default();
+                Ok(CommandOutcome::McpSuccess(format!(
+                    "// VS Code Copilot Agent mode uses .vscode/mcp.json (plan 0003 §2.3)\n{json}"
+                )))
+            }
+            "gemini" => {
+                let config = ManifestGenerator::generate_gemini_cli("tantra", &["mcp", "--stdio"]);
+                Ok(CommandOutcome::McpSuccess(
+                    serde_json::to_string_pretty(&config).unwrap_or_default(),
+                ))
+            }
+            other => Err(CliError::Execution(format!(
+                "unknown MCP client '{other}' (expected claude-code, cursor, vscode, gemini)"
+            ))),
+        },
+    }
+}
+
+/// Inspect and call the quantitative MCP gateway tools (`tantra tools`).
+///
+/// Talks to the in-process `tantra-agent-mcp` gateway directly — the same tool
+/// catalog the `mcp_stdio_server` binary exposes over stdio (plan 0003).
+pub fn run_tools(args: &ToolsArgs) -> Result<CommandOutcome, CliError> {
+    match args {
+        ToolsArgs::Search { query, category } => {
+            let server = McpServer::new();
+            let arguments = serde_json::json!({ "query": query, "category": category });
+            let envelope = server
+                .search_tools(&arguments)
+                .map_err(|e| CliError::Execution(e.to_string()))?;
+            let tools = envelope
+                .get("data")
+                .and_then(|data| data.get("tools"))
+                .and_then(|tools| tools.as_array())
+                .ok_or_else(|| {
+                    CliError::Execution("gateway response missing data.tools".to_string())
+                })?;
+            let lines = tools
+                .iter()
+                .map(|tool| {
+                    let name = tool.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                    let category = tool.get("category").and_then(|v| v.as_str()).unwrap_or("");
+                    let tagline = tool.get("tagline").and_then(|v| v.as_str()).unwrap_or("");
+                    format!("- {name} ({category}): {tagline}")
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            Ok(CommandOutcome::ToolsSuccess(format!(
+                "Found {} matching tool(s):\n{lines}",
+                tools.len()
+            )))
+        }
+        ToolsArgs::Describe { name } => {
+            let server = McpServer::new();
+            let envelope = server
+                .describe_tool(&serde_json::json!({ "tool_name": name }))
+                .map_err(|e| CliError::Execution(e.to_string()))?;
+            let data = envelope.get("data").cloned().unwrap_or(envelope);
+            Ok(CommandOutcome::ToolsSuccess(
+                serde_json::to_string_pretty(&data).unwrap_or_default(),
+            ))
+        }
+        ToolsArgs::Call { name, arguments } => {
+            let args: serde_json::Value = serde_json::from_str(arguments)
+                .map_err(|e| CliError::Execution(format!("invalid JSON arguments: {e}")))?;
+            let server = McpServer::new();
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| CliError::Execution(format!("failed to initialize tokio: {e}")))?;
+            let envelope = rt
+                .block_on(server.call_tool(name, args))
+                .map_err(|e| CliError::Execution(e.to_string()))?;
+            Ok(CommandOutcome::ToolsSuccess(
+                crate::block_render::render_envelope(&envelope),
+            ))
         }
     }
 }

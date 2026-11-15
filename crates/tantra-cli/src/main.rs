@@ -66,6 +66,7 @@ fn main() -> ExitCode {
                 CommandOutcome::PluginSuccess(msg) => println!("{msg}"),
                 CommandOutcome::SkillsSuccess(msg) => println!("{msg}"),
                 CommandOutcome::McpSuccess(msg) => println!("{msg}"),
+                CommandOutcome::ToolsSuccess(msg) => println!("{msg}"),
                 CommandOutcome::DoctorReport(report) => println!("{report}"),
                 CommandOutcome::PurgeSuccess(msg) => println!("{msg}"),
                 CommandOutcome::HealthReport(report) => println!("{report}"),

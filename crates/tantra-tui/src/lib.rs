@@ -25,6 +25,7 @@ pub mod app;
 pub mod keybindings;
 pub mod layout;
 pub mod live_data;
+pub mod result_block;
 pub mod terminal;
 pub mod ui;
 

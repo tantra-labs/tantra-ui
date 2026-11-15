@@ -18,6 +18,7 @@
 
 pub mod args;
 pub mod backtest_gen;
+pub mod block_render;
 pub mod jobs_runtime;
 pub mod memory_store;
 pub mod runner;
@@ -37,7 +38,7 @@ pub use jobs_runtime::{
 };
 pub use runner::{
     CliError, CommandOutcome, resolve_provider, run, run_doctor_with_home, run_health_with_home,
-    run_jobs_with_home, run_mcp_with_home, run_memory_with_home, run_plugin_with_home,
-    run_purge_with_home, run_skills_with_home, run_with_provider,
+    run_jobs_with_home, run_mcp, run_mcp_with_home, run_memory_with_home, run_plugin_with_home,
+    run_purge_with_home, run_skills_with_home, run_tools, run_with_provider,
 };
 pub use strategy_bridge::StrategyBridge;

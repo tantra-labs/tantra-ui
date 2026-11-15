@@ -247,7 +247,28 @@ pub enum SkillsArgs {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum McpArgs {
     List,
-    Connect { name: String, command: String },
+    Connect {
+        name: String,
+        command: String,
+    },
+    /// Generate MCP client config for an external coding agent.
+    Config {
+        client: String,
+    },
+}
+
+/// Arguments for `tantra tools`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ToolsArgs {
+    /// Search the quantitative MCP gateway tool catalog.
+    Search {
+        query: String,
+        category: Option<String>,
+    },
+    /// Show the JSON schema for a gateway tool.
+    Describe { name: String },
+    /// Call a gateway tool and render its result envelope.
+    Call { name: String, arguments: String },
 }
 
 /// Arguments for `tantra doctor`.
@@ -366,6 +387,8 @@ pub enum Command {
     Skills(SkillsArgs),
     /// Manage Model Context Protocol (MCP) servers and tools.
     Mcp(McpArgs),
+    /// Inspect and call the quantitative MCP gateway tools.
+    Tools(ToolsArgs),
     /// Diagnostic environment check and automatic repair.
     Doctor(DoctorArgs),
     /// Purge temporary caches and session traces.
@@ -629,6 +652,11 @@ pub enum CliCommand {
         #[command(subcommand)]
         subcommand: Option<McpSubcommand>,
     },
+    /// Inspect and call the quantitative MCP gateway tools.
+    Tools {
+        #[command(subcommand)]
+        subcommand: Option<ToolsSubcommand>,
+    },
     /// Diagnostic environment check and automatic repair.
     Doctor {
         /// Automatically provision missing directories, tables, and sidecars.
@@ -863,6 +891,36 @@ pub enum McpSubcommand {
         /// Command or endpoint to connect.
         command: String,
     },
+    /// Generate MCP client config for an external coding agent.
+    Config {
+        /// Client name (claude-code, cursor, vscode, gemini).
+        client: String,
+    },
+}
+
+/// Tools subcommands.
+#[derive(Debug, Subcommand, Clone, PartialEq, Eq)]
+pub enum ToolsSubcommand {
+    /// Search the quantitative MCP gateway tool catalog.
+    Search {
+        /// Free-text query against tool names, categories, and taglines.
+        query: String,
+        /// Optional category filter.
+        #[arg(long)]
+        category: Option<String>,
+    },
+    /// Show the JSON schema for a gateway tool.
+    Describe {
+        /// Tool name (e.g. tantra_garch_volatility).
+        name: String,
+    },
+    /// Call a gateway tool and render its result envelope.
+    Call {
+        /// Tool name.
+        name: String,
+        /// Tool arguments as a JSON object.
+        arguments: String,
+    },
 }
 
 /// Strategy subcommands.
@@ -1061,6 +1119,20 @@ impl From<Cli> for CliArgs {
                 None | Some(McpSubcommand::List) => McpArgs::List,
                 Some(McpSubcommand::Connect { name, command }) => {
                     McpArgs::Connect { name, command }
+                }
+                Some(McpSubcommand::Config { client }) => McpArgs::Config { client },
+            }),
+            Some(CliCommand::Tools { subcommand }) => Command::Tools(match subcommand {
+                None => ToolsArgs::Search {
+                    query: String::new(),
+                    category: None,
+                },
+                Some(ToolsSubcommand::Search { query, category }) => {
+                    ToolsArgs::Search { query, category }
+                }
+                Some(ToolsSubcommand::Describe { name }) => ToolsArgs::Describe { name },
+                Some(ToolsSubcommand::Call { name, arguments }) => {
+                    ToolsArgs::Call { name, arguments }
                 }
             }),
             Some(CliCommand::Doctor { fix, json }) => Command::Doctor(DoctorArgs { fix, json }),

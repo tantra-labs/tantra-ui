@@ -24,6 +24,7 @@ tantra-agent-core.workspace = true
 tantra-agent-chat.workspace = true
 tantra-agent-llm.workspace = true
 tantra-agent-chat-tools.workspace = true
+tantra-agent-mcp = { path = "../../../tantra-agent/crates/tantra-agent-mcp" }
 tantra-runtime-jobs.workspace = true
 tantra-runtime-api.workspace = true
 tantra-runtime-api-rest.workspace = true

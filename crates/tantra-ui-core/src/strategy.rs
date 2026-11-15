@@ -509,6 +509,10 @@ pub struct StrategyBridge;
 impl StrategyBridge {
     /// Discover all available strategies (native built-in strategies + scanned TOML manifests).
     pub fn discover_strategies() -> Vec<StrategyDescriptor> {
+        // `mut` is only used by the host-side manifest scan below; on wasm the
+        // scan body is cfg'd out and the mut is unused (unused_mut fires on the
+        // wasm target only).
+        #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
         let mut list = Self::builtin_strategies();
 
         // Scan common manifest directories
