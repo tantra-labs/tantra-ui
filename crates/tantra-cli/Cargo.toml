@@ -38,6 +38,13 @@ serde_json.workspace = true
 thiserror.workspace = true
 toml.workspace = true
 async-trait = "0.1"
+# Live `tantra scan --server` path (`GET /screener/scan`); reqwest 0.12.28 is
+# already in the workspace lock graph via tantra-agent-chat.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 
 [dev-dependencies]
 tempfile = "3"
+# In-memory screener router for the live-scan integration test; both already in
+# the workspace lock graph via tantra-runtime-api-rest.
+axum = { version = "0.7" }
+tower = { version = "0.4", features = ["util"] }

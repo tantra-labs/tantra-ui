@@ -545,6 +545,24 @@ impl StrategyBridge {
 
     /// Load a strategy manifest from a TOML file.
     pub fn load_manifest_file(path: &Path) -> Option<StrategyDescriptor> {
+        // Manifest loading is a host-side (filesystem) feature; the catalog
+        // never reads files on `wasm32-unknown-unknown` (the only caller is
+        // cfg-gated above). This cfg keeps the crate compiling for the WASM
+        // invariant of `tantra-ui-app`'s CSR view layer (gap 0004).
+        #[cfg(target_arch = "wasm32")]
+        {
+            let _ = path;
+            None
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            Self::load_manifest_file_host(path)
+        }
+    }
+
+    /// Host-side manifest loader: reads and parses a TOML strategy manifest.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn load_manifest_file_host(path: &Path) -> Option<StrategyDescriptor> {
         let content = fs::read_to_string(path).ok()?;
         let toml_val: toml::Value = toml::from_str(&content).ok()?;
 

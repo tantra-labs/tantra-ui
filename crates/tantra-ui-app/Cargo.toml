@@ -26,6 +26,12 @@ rust_decimal.workspace = true
 uuid = { workspace = true, features = ["rng-getrandom"] }
 # Enables getrandom's `wasm_js` backend for wasm32-unknown-unknown.
 getrandom = { workspace = true }
+# Leptos 0.8 client-side-rendered (CSR) view layer (gap 0004 / T10.2).
+# `default-features = false` + `csr` only keeps the surface minimal for the
+# wasm32-unknown-unknown invariant: no `ssr`/`hydrate`, no `tokio`, no OS
+# threads, no blocking I/O. The view layer renders the eight `AppRoute` views
+# from the in-memory feature-state models.
+leptos = { version = "0.8", default-features = false, features = ["csr"] }
 
 [dev-dependencies]
 serde_json.workspace = true

@@ -19,6 +19,7 @@
 pub mod args;
 pub mod backtest_gen;
 pub mod jobs_runtime;
+pub mod memory_store;
 pub mod runner;
 pub mod scan;
 pub mod strategy_bridge;
@@ -35,6 +36,8 @@ pub use jobs_runtime::{
     mint_run_id, short_id,
 };
 pub use runner::{
-    CliError, CommandOutcome, resolve_provider, run, run_jobs_with_home, run_with_provider,
+    CliError, CommandOutcome, resolve_provider, run, run_doctor_with_home, run_health_with_home,
+    run_jobs_with_home, run_mcp_with_home, run_memory_with_home, run_plugin_with_home,
+    run_purge_with_home, run_skills_with_home, run_with_provider,
 };
 pub use strategy_bridge::StrategyBridge;

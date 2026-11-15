@@ -97,10 +97,25 @@ pub struct ChatArgs {
 }
 
 /// Arguments for `tantra scan`.
-#[derive(Debug, Clone, PartialEq, Eq, Args)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Args)]
 pub struct ScanArgs {
     /// The screener query (e.g. `"roe>15 and pe between 10 30"`).
     pub query: String,
+    /// Live screener server base URL (e.g. http://127.0.0.1:8000). When set, the
+    /// scan runs against that server's `GET /screener/scan`; when unset, the
+    /// offline fixture universe is used.
+    #[arg(long)]
+    pub server: Option<String>,
+    /// JSON array of instrument ids for the live path (e.g. '["TCS.NSE","INFY.NSE"]').
+    /// Defaults to the fixture symbols when absent.
+    #[arg(long)]
+    pub universe: Option<String>,
+    /// Bar timeframe for the live path (default "1d").
+    #[arg(long, default_value = "1d")]
+    pub tf: Option<String>,
+    /// Evaluate on the bars known at this date (RFC3339 or ISO-8601, inclusive).
+    #[arg(long)]
+    pub as_of: Option<String>,
 }
 
 /// Arguments for `tantra serve`: boots `tantra-runtime-api-rest` as a standalone HTTP server
@@ -545,6 +560,18 @@ pub enum CliCommand {
     Scan {
         /// The screener query.
         query: String,
+        /// Live screener server base URL; when unset the offline fixture is used.
+        #[arg(long)]
+        server: Option<String>,
+        /// JSON array of instrument ids for the live path.
+        #[arg(long)]
+        universe: Option<String>,
+        /// Bar timeframe for the live path (default "1d").
+        #[arg(long, default_value = "1d")]
+        tf: Option<String>,
+        /// Evaluate on the bars known at this date.
+        #[arg(long)]
+        as_of: Option<String>,
     },
     /// Boot the `tantra-runtime-api-rest` HTTP server.
     Serve {
@@ -921,7 +948,19 @@ impl From<Cli> for CliArgs {
                 format,
             }),
             Some(CliCommand::Chat { system_prompt }) => Command::Chat(ChatArgs { system_prompt }),
-            Some(CliCommand::Scan { query }) => Command::Scan(ScanArgs { query }),
+            Some(CliCommand::Scan {
+                query,
+                server,
+                universe,
+                tf,
+                as_of,
+            }) => Command::Scan(ScanArgs {
+                query,
+                server,
+                universe,
+                tf,
+                as_of,
+            }),
             Some(CliCommand::Serve {
                 data_dir,
                 addr,

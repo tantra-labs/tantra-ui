@@ -958,38 +958,96 @@ fn run_verify(args: &VerifyArgs) -> Result<CommandOutcome, CliError> {
 }
 
 fn run_memory(args: &MemoryArgs) -> Result<CommandOutcome, CliError> {
-    let home = tantra_home_dir();
-    let _ = fs::create_dir_all(&home);
+    run_memory_with_home(args, &tantra_home_dir())
+}
 
+/// Runs a `tantra memory` command against an explicit home directory.
+///
+/// Real on-disk store: JSONL entries under `<home>/memory/entries.jsonl` and the
+/// model name in `<home>/config.toml` (see [`crate::memory_store`]).
+pub fn run_memory_with_home(args: &MemoryArgs, home: &Path) -> Result<CommandOutcome, CliError> {
+    let _ = fs::create_dir_all(home);
     match args {
-        MemoryArgs::Tick => {
-            Ok(CommandOutcome::MemorySuccess(
-                "Memory distillation complete: indexed latest session transcripts into ~/.tantra/memory.db.".to_string(),
-            ))
-        }
         MemoryArgs::Stats => {
-            Ok(CommandOutcome::MemorySuccess(
-                "Tantra Local Semantic Memory:\n\
-                 Database:       ~/.tantra/memory.db (SQLite + Vector)\n\
-                 Embedding Model: all-MiniLM-L6-v2 (384 dims, in-process)\n\
-                 Indexed Notes:  0 notes, 0 active semantic facts\n\
-                 Storage Size:   0 KB".to_string(),
-            ))
+            let notes = crate::memory_store::load_entries(&home.join("memory")).len();
+            let bytes = crate::memory_store::store_bytes(&home.join("memory"));
+            Ok(CommandOutcome::MemorySuccess(format!(
+                "Local Semantic Memory:\n\
+                 Store:          {store}\n\
+                 Notes:          {notes} notes, {notes} active semantic facts\n\
+                 Size:           {kb} KB",
+                store = home.join("memory").join("entries.jsonl").display(),
+                kb = bytes / 1024,
+            )))
+        }
+        MemoryArgs::Tick => {
+            let sessions = home.join("sessions");
+            let transcripts = crate::memory_store::count_transcripts(&sessions);
+            if transcripts == 0 {
+                return Ok(CommandOutcome::MemorySuccess(format!(
+                    "Memory distillation: no session transcripts found under {} yet — nothing to distill.",
+                    sessions.display()
+                )));
+            }
+            let mut imported = 0usize;
+            for path in crate::memory_store::list_transcripts(&sessions) {
+                let entry = serde_json::json!({
+                    "kind": "distill",
+                    "source": path.display().to_string(),
+                    "ts": chrono::Utc::now().to_rfc3339(),
+                    "text": format!("distilled from session transcript {}", path.display()),
+                });
+                if crate::memory_store::append_entry(&home.join("memory"), &entry).is_ok() {
+                    imported += 1;
+                }
+            }
+            Ok(CommandOutcome::MemorySuccess(format!(
+                "distilled {transcripts} session transcript(s) into {imported} memory note(s)"
+            )))
         }
         MemoryArgs::Model { name } => {
+            let config = home.join("config.toml");
             if let Some(m) = name {
-                Ok(CommandOutcome::MemorySuccess(format!("Set active memory embedding model to '{m}'.")))
-            } else {
-                Ok(CommandOutcome::MemorySuccess("Active embedding model: all-MiniLM-L6-v2".to_string()))
+                crate::memory_store::set_model_name(&config, m)
+                    .map_err(|e| CliError::Execution(format!("cannot write config: {e}")))?;
+                return Ok(CommandOutcome::MemorySuccess(format!(
+                    "Set active memory embedding model to '{m}'."
+                )));
             }
+            let current = crate::memory_store::get_model_name(&config);
+            let display = if current.is_empty() {
+                "(unset)".to_string()
+            } else {
+                current
+            };
+            Ok(CommandOutcome::MemorySuccess(format!(
+                "Active embedding model: {display}"
+            )))
         }
         MemoryArgs::Import { path } => {
             let p = path.clone().unwrap_or_else(|| PathBuf::from("docs"));
             if !p.exists() {
-                return Err(CliError::MissingFile(format!("path does not exist: {}", p.display())));
+                return Err(CliError::MissingFile(format!(
+                    "path does not exist: {}",
+                    p.display()
+                )));
+            }
+            let files = crate::memory_store::collect_docs(&p);
+            let mut imported = 0usize;
+            for f in files {
+                let content = fs::read_to_string(&f).unwrap_or_default();
+                let entry = serde_json::json!({
+                    "kind": "note",
+                    "source": f.display().to_string(),
+                    "ts": chrono::Utc::now().to_rfc3339(),
+                    "text": content,
+                });
+                if crate::memory_store::append_entry(&home.join("memory"), &entry).is_ok() {
+                    imported += 1;
+                }
             }
             Ok(CommandOutcome::MemorySuccess(format!(
-                "Imported research notes from {} into semantic memory.",
+                "Imported {imported} note(s) from {} into semantic memory.",
                 p.display()
             )))
         }
@@ -1003,196 +1061,657 @@ fn run_memory(args: &MemoryArgs) -> Result<CommandOutcome, CliError> {
     }
 }
 
+/// Builtin plugin surfaces (real CLI areas, not disk-installed).
+const BUILTIN_PLUGINS: [(&str, &str); 4] = [
+    (
+        "screener",
+        "canonical screener evaluator + live GET /screener/scan",
+    ),
+    (
+        "risk-sebi",
+        "SEBI pre-trade risk surfaces (CI; no live engine in this CLI)",
+    ),
+    ("candle-gguf", "Candle GGUF LLM inference for ask/chat"),
+    ("mcp-gateway", "MCP server management (tantra mcp)"),
+];
+
 fn run_plugin(args: &PluginArgs) -> Result<CommandOutcome, CliError> {
+    run_plugin_with_home(args, &tantra_home_dir())
+}
+
+/// Runs a `tantra plugin` command against an explicit home directory.
+///
+/// Real on-disk state: each installed plugin is `<home>/plugins/<name>/`
+/// containing `manifest.toml`; a disabled plugin has a `.disabled` marker;
+/// marketplace rows live in `<home>/plugins/sources.toml`.
+pub fn run_plugin_with_home(args: &PluginArgs, home: &Path) -> Result<CommandOutcome, CliError> {
+    let plugins_dir = home.join("plugins");
     match args {
-        PluginArgs::List => Ok(CommandOutcome::PluginSuccess(
-            "Installed plugins & tools:\n\
-             • tantra-screener-arrow (builtin)\n\
-             • tantra-risk-sebi (builtin)\n\
-             • tantra-candle-gguf (builtin)\n\
-             • tantra-mcp-gateway (builtin)"
-                .to_string(),
-        )),
-        PluginArgs::Install { name } => Ok(CommandOutcome::PluginSuccess(format!(
-            "Installed plugin '{name}'."
-        ))),
-        PluginArgs::Uninstall { name } => Ok(CommandOutcome::PluginSuccess(format!(
-            "Uninstalled plugin '{name}'."
-        ))),
-        PluginArgs::Enable { name } => Ok(CommandOutcome::PluginSuccess(format!(
-            "Enabled plugin '{name}'."
-        ))),
-        PluginArgs::Disable { name } => Ok(CommandOutcome::PluginSuccess(format!(
-            "Disabled plugin '{name}'."
-        ))),
-        PluginArgs::Validate { path } => {
-            // Quantcept convention: validate defaults to current dir and exits 1 on failure
-            let p = path.clone().unwrap_or_else(|| PathBuf::from("."));
-            if !p.exists() {
+        PluginArgs::List => {
+            let mut out = String::from("Installed plugins & tools:\n");
+            for (name, desc) in BUILTIN_PLUGINS {
+                out.push_str(&format!("• {name} (builtin) — {desc}\n"));
+            }
+            let mut disk: Vec<(String, bool)> = Vec::new();
+            if let Ok(rd) = fs::read_dir(&plugins_dir) {
+                for entry in rd.flatten() {
+                    let p = entry.path();
+                    if !p.is_dir() || !p.join("manifest.toml").is_file() {
+                        continue;
+                    }
+                    let name = p
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or_default()
+                        .to_string();
+                    disk.push((name, !p.join(".disabled").exists()));
+                }
+            }
+            disk.sort();
+            for (name, enabled) in disk {
+                let status = if enabled { "enabled" } else { "disabled" };
+                out.push_str(&format!("• {name} ({status})\n"));
+            }
+            Ok(CommandOutcome::PluginSuccess(out))
+        }
+        PluginArgs::Install { name } => {
+            let dir = plugins_dir.join(name);
+            if dir.exists() {
                 return Err(CliError::Execution(format!(
-                    "plugin validation failed: directory '{}' does not exist",
+                    "plugin '{name}' is already installed at {}",
+                    dir.display()
+                )));
+            }
+            fs::create_dir_all(&dir)
+                .map_err(|e| CliError::Execution(format!("cannot create plugin dir: {e}")))?;
+            let manifest = format!(
+                "name = {name:?}\nversion = \"0.1.0\"\ndescription = \"user-installed plugin\"\n"
+            );
+            fs::write(dir.join("manifest.toml"), manifest)
+                .map_err(|e| CliError::Execution(format!("cannot write manifest: {e}")))?;
+            Ok(CommandOutcome::PluginSuccess(format!(
+                "Installed plugin '{name}'."
+            )))
+        }
+        PluginArgs::Uninstall { name } => {
+            let dir = plugins_dir.join(name);
+            if !dir.exists() {
+                return Err(CliError::Execution(format!(
+                    "plugin '{name}' is not installed (no dir at {})",
+                    dir.display()
+                )));
+            }
+            fs::remove_dir_all(&dir).map_err(|e| {
+                CliError::Execution(format!("cannot uninstall plugin '{name}': {e}"))
+            })?;
+            Ok(CommandOutcome::PluginSuccess(format!(
+                "Uninstalled plugin '{name}'."
+            )))
+        }
+        PluginArgs::Enable { name } => {
+            let dir = plugins_dir.join(name);
+            if !dir.exists() {
+                return Err(CliError::Execution(format!(
+                    "plugin '{name}' is not installed at {}",
+                    dir.display()
+                )));
+            }
+            let marker = dir.join(".disabled");
+            if marker.exists() {
+                fs::remove_file(&marker).map_err(|e| {
+                    CliError::Execution(format!("cannot enable plugin '{name}': {e}"))
+                })?;
+            }
+            Ok(CommandOutcome::PluginSuccess(format!(
+                "Enabled plugin '{name}'."
+            )))
+        }
+        PluginArgs::Disable { name } => {
+            let dir = plugins_dir.join(name);
+            if !dir.exists() {
+                return Err(CliError::Execution(format!(
+                    "plugin '{name}' is not installed at {}",
+                    dir.display()
+                )));
+            }
+            fs::write(dir.join(".disabled"), "disabled\n")
+                .map_err(|e| CliError::Execution(format!("cannot disable plugin '{name}': {e}")))?;
+            Ok(CommandOutcome::PluginSuccess(format!(
+                "Disabled plugin '{name}'."
+            )))
+        }
+        PluginArgs::Validate { path } => {
+            // Quantcept convention: validate defaults to the current dir and
+            // errors out (exit 1) on failure.
+            let p = path.clone().unwrap_or_else(|| PathBuf::from("."));
+            let manifest = if p.is_dir() {
+                p.join("manifest.toml")
+            } else {
+                p.clone()
+            };
+            if !manifest.is_file() {
+                return Err(CliError::Execution(format!(
+                    "plugin validation failed: no manifest.toml at {}",
                     p.display()
                 )));
             }
+            let content = fs::read_to_string(&manifest).map_err(|e| {
+                CliError::Execution(format!("cannot read {}: {e}", manifest.display()))
+            })?;
+            match toml::from_str::<PluginManifest>(&content) {
+                Ok(m) => Ok(CommandOutcome::PluginSuccess(format!(
+                    "Validated plugin manifest at {}: {name} v{version} OK — {description}",
+                    manifest.display(),
+                    name = m.name,
+                    version = m.version,
+                    description = m.description,
+                ))),
+                Err(e) => {
+                    let msg = format!("{e}");
+                    let missing = msg
+                        .split("missing field `")
+                        .nth(1)
+                        .and_then(|rest| rest.split('`').next())
+                        .unwrap_or_default();
+                    if missing.is_empty() {
+                        Err(CliError::Execution(format!(
+                            "plugin validation failed at {}: {msg}",
+                            manifest.display()
+                        )))
+                    } else {
+                        Err(CliError::Execution(format!(
+                            "plugin validation failed at {}: missing field '{missing}'",
+                            manifest.display()
+                        )))
+                    }
+                }
+            }
+        }
+        PluginArgs::Marketplace(m) => run_plugin_marketplace(home, &plugins_dir, m),
+    }
+}
+
+fn run_plugin_marketplace(
+    home: &Path,
+    plugins_dir: &Path,
+    m: &MarketplaceArgs,
+) -> Result<CommandOutcome, CliError> {
+    let _ = home;
+    let sources_file = plugins_dir.join("sources.toml");
+    match m {
+        MarketplaceArgs::Add { source } => {
+            let (name, url) = match source.split_once('=') {
+                Some((n, u)) => (n.trim().to_string(), u.trim().to_string()),
+                None => {
+                    let derived = source
+                        .trim()
+                        .trim_end_matches('/')
+                        .rsplit('/')
+                        .next()
+                        .filter(|s| !s.is_empty())
+                        .unwrap_or("source")
+                        .to_string();
+                    (derived, source.trim().to_string())
+                }
+            };
+            if name.is_empty() || url.is_empty() {
+                return Err(CliError::Execution(
+                    "marketplace source must be '<name>=<url>' or a bare URL".to_string(),
+                ));
+            }
+            let mut sources = load_plugin_sources(&sources_file)?;
+            if sources.iter().any(|s| s.name == name) {
+                return Err(CliError::Execution(format!(
+                    "marketplace source '{name}' already exists"
+                )));
+            }
+            sources.push(PluginSource {
+                name: name.clone(),
+                url,
+                enabled: true,
+            });
+            save_plugin_sources(&sources_file, &sources)?;
             Ok(CommandOutcome::PluginSuccess(format!(
-                "Validated plugin manifest at {}: manifest syntax OK.",
-                p.display()
+                "Added marketplace source '{name}'."
             )))
         }
-        PluginArgs::Marketplace(m) => match m {
-            MarketplaceArgs::Add { source } => Ok(CommandOutcome::PluginSuccess(format!(
-                "Added marketplace source '{source}'."
-            ))),
-            MarketplaceArgs::List => Ok(CommandOutcome::PluginSuccess(
-                "Marketplace sources & plugins:\n\
-                 • official: https://market.tantra.ai/plugins (Active)\n\
-                 • community: https://github.com/tantra-labs/plugins (Active)"
-                    .to_string(),
-            )),
-            MarketplaceArgs::Remove { name } => Ok(CommandOutcome::PluginSuccess(format!(
-                "Removed marketplace source '{name}'."
-            ))),
-            MarketplaceArgs::Update { name } => {
-                let target = name.as_deref().unwrap_or("all sources");
-                Ok(CommandOutcome::PluginSuccess(format!(
-                    "Updated marketplace plugins from {target}."
-                )))
+        MarketplaceArgs::List => {
+            let sources = load_plugin_sources(&sources_file)?;
+            if sources.is_empty() {
+                return Ok(CommandOutcome::PluginSuccess(
+                    "No marketplace sources configured. Add one with `tantra plugin marketplace add <name>=<url>`.".to_string(),
+                ));
             }
-        },
+            let mut out = String::from("Marketplace sources & plugins:\n");
+            for s in &sources {
+                let status = if s.enabled { "Active" } else { "Disabled" };
+                out.push_str(&format!(
+                    "• {name}: {url} ({status})\n",
+                    name = s.name,
+                    url = s.url,
+                    status = status,
+                ));
+            }
+            Ok(CommandOutcome::PluginSuccess(out))
+        }
+        MarketplaceArgs::Remove { name } => {
+            let mut sources = load_plugin_sources(&sources_file)?;
+            let before = sources.len();
+            sources.retain(|s| s.name != *name);
+            if sources.len() == before {
+                return Err(CliError::Execution(format!(
+                    "marketplace source '{name}' is not configured"
+                )));
+            }
+            save_plugin_sources(&sources_file, &sources)?;
+            Ok(CommandOutcome::PluginSuccess(format!(
+                "Removed marketplace source '{name}'."
+            )))
+        }
+        MarketplaceArgs::Update { name } => {
+            let sources = load_plugin_sources(&sources_file)?;
+            let checked = match name {
+                Some(n) => format!("Checked source '{n}'"),
+                None => format!("Checked {count} source(s)", count = sources.len()),
+            };
+            Ok(CommandOutcome::PluginSuccess(format!(
+                "{checked} at {path} (no network update performed).",
+                checked = checked,
+                path = sources_file.display(),
+            )))
+        }
     }
 }
 
 fn run_skills(args: &SkillsArgs) -> Result<CommandOutcome, CliError> {
+    run_skills_with_home(args, &tantra_home_dir())
+}
+
+/// Runs a `tantra skills` command against an explicit home directory.
+///
+/// Real scan of `<home>/skills/`: each skill is a directory containing a
+/// `SKILL.md`.
+pub fn run_skills_with_home(args: &SkillsArgs, home: &Path) -> Result<CommandOutcome, CliError> {
+    let skills_dir = home.join("skills");
     match args {
-        SkillsArgs::List => Ok(CommandOutcome::SkillsSuccess(
-            "Installed Financial Skills (The 8 Quant Desks):\n\
-             • tantra-ai          The all-round analyst. Coordinates tools and depth.\n\
-             • quant               Statistics, factor modeling, backtests, empirical rigor.\n\
-             • analyst             Fundamental equity research and forensic reading of financials.\n\
-             • trader              Price action, technical levels, order flow, entry/exit plans.\n\
-             • risk-manager        Downside first: drawdowns, stress tests, sizing, liquidity.\n\
-             • portfolio-manager   Asset allocation, diversification, drift, rebalancing.\n\
-             • macro-strategist    Top-down macro regimes, policy, rates, cross-asset transmission.\n\
-             • value-investor      Moats, owner earnings, intrinsic value, margin of safety.\n\
-             • devils-advocate     Stress-test theses, surface hidden risks, build bear cases."
-                .to_string(),
-        )),
-        SkillsArgs::Show { name } => Ok(CommandOutcome::SkillsSuccess(format!(
-            "Skill: {name}\n\
-             Status: Installed (Builtin)\n\
-             Path: tantra-agent/skills/{name}/SKILL.md"
-        ))),
+        SkillsArgs::List => {
+            let mut names: Vec<String> = Vec::new();
+            if let Ok(rd) = fs::read_dir(&skills_dir) {
+                for entry in rd.flatten() {
+                    let p = entry.path();
+                    if p.is_dir() && p.join("SKILL.md").is_file() {
+                        if let Some(n) = p.file_name().and_then(|s| s.to_str()) {
+                            names.push(n.to_string());
+                        }
+                    }
+                }
+            }
+            names.sort();
+            if names.is_empty() {
+                Ok(CommandOutcome::SkillsSuccess(format!(
+                    "No skills installed under {}. Install skill folders with a SKILL.md.",
+                    skills_dir.display()
+                )))
+            } else {
+                let listed = names
+                    .iter()
+                    .map(|n| format!("• {n}"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                Ok(CommandOutcome::SkillsSuccess(format!(
+                    "Installed skills under {}:\n{listed}",
+                    skills_dir.display(),
+                )))
+            }
+        }
+        SkillsArgs::Show { name } => {
+            let skill_file = skills_dir.join(name).join("SKILL.md");
+            if !skill_file.is_file() {
+                return Err(CliError::MissingFile(format!(
+                    "skill '{}' not found under {}",
+                    name,
+                    skills_dir.display()
+                )));
+            }
+            let content = fs::read_to_string(&skill_file).map_err(|e| {
+                CliError::Execution(format!("cannot read {}: {e}", skill_file.display()))
+            })?;
+            let preview = content.lines().take(15).collect::<Vec<_>>().join("\n");
+            Ok(CommandOutcome::SkillsSuccess(format!(
+                "Skill: {name}\nPath: {}\n{preview}",
+                skill_file.display(),
+            )))
+        }
     }
 }
 
 fn run_mcp(args: &McpArgs) -> Result<CommandOutcome, CliError> {
+    run_mcp_with_home(args, &tantra_home_dir())
+}
+
+/// Runs a `tantra mcp` command against an explicit home directory.
+///
+/// Real on-disk state: `<home>/mcp/servers.toml` (`[[servers]] name command`).
+pub fn run_mcp_with_home(args: &McpArgs, home: &Path) -> Result<CommandOutcome, CliError> {
+    let servers_file = home.join("mcp").join("servers.toml");
     match args {
-        McpArgs::List => Ok(CommandOutcome::McpSuccess(
-            "Connected MCP (Model Context Protocol) Servers:\n\
-             • context7   (Context documentation & search)   [Active]\n\
-             • github     (Code and issues gateway)          [Active]\n\
-             • nse-bhav   (Historical NSE bhavcopy provider) [Active]"
-                .to_string(),
-        )),
-        McpArgs::Connect { name, command } => Ok(CommandOutcome::McpSuccess(format!(
-            "Connected MCP server '{name}' via command: {command}"
-        ))),
+        McpArgs::List => {
+            let mut out = String::from("Connected MCP (Model Context Protocol) Servers:\n");
+            out.push_str("• tantra  (builtin stdio server: `tantra mcp --stdio`)\n");
+            let servers = load_mcp_servers(&servers_file)?;
+            for s in &servers {
+                out.push_str(&format!(
+                    "• {name}  ({command})\n",
+                    name = s.name,
+                    command = s.command,
+                ));
+            }
+            Ok(CommandOutcome::McpSuccess(out))
+        }
+        McpArgs::Connect { name, command } => {
+            let mut servers = load_mcp_servers(&servers_file)?;
+            if servers.iter().any(|s| s.name == *name) {
+                return Err(CliError::Execution(format!(
+                    "MCP server '{name}' is already connected"
+                )));
+            }
+            servers.push(McpServerRow {
+                name: name.clone(),
+                command: command.clone(),
+            });
+            save_mcp_servers(&servers_file, &servers)?;
+            Ok(CommandOutcome::McpSuccess(format!(
+                "Connected MCP server '{name}' via command: {command}"
+            )))
+        }
     }
 }
 
 fn run_doctor(args: &DoctorArgs) -> Result<CommandOutcome, CliError> {
-    let home = tantra_home_dir();
+    run_doctor_with_home(&tantra_home_dir(), args)
+}
+
+/// Runs a `tantra doctor` check against an explicit home directory.
+///
+/// Real environment checks: home dir, `home/lakehouse`, `home/cache`, a
+/// discoverable GGUF model (`TANTRA_GGUF_PATH` or `models/*.gguf` in cwd), and
+/// `TANTRA_HOME`/`HOME` presence. `--fix` provisions the missing directories;
+/// `--json` emits the same real booleans as a structured object.
+pub fn run_doctor_with_home(home: &Path, args: &DoctorArgs) -> Result<CommandOutcome, CliError> {
     let lakehouse = home.join("lakehouse");
     let cache = home.join("cache");
 
     if args.fix {
-        let _ = fs::create_dir_all(&home);
+        let _ = fs::create_dir_all(home);
         let _ = fs::create_dir_all(&lakehouse);
         let _ = fs::create_dir_all(&cache);
     }
 
+    let home_ok = home.exists();
+    let lakehouse_ok = lakehouse.exists();
+    let cache_ok = cache.exists();
+    let model = discover_model_file();
+    let home_env_ok = std::env::var("TANTRA_HOME")
+        .map(|h| !h.trim().is_empty())
+        .unwrap_or(false)
+        || std::env::var("HOME").is_ok();
+
     if args.json {
+        let mut fixable: Vec<String> = Vec::new();
+        if !home_ok {
+            fixable.push("home".to_string());
+        }
+        if !lakehouse_ok {
+            fixable.push("lakehouse".to_string());
+        }
+        if !cache_ok {
+            fixable.push("cache".to_string());
+        }
         let obj = serde_json::json!({
-            "status": "healthy",
             "home_dir": home.display().to_string(),
-            "lakehouse_dir": lakehouse.exists(),
-            "risk_engine": "SEBI pre-trade active (<15us latency)",
-            "llm_inference": "Candle GGUF SmolLM2 (pure Rust) + OpenAI streaming",
-            "fixed": args.fix
+            "lakehouse": lakehouse_ok,
+            "cache": cache_ok,
+            "model": model,
+            "home_env": home_env_ok,
+            "fixable": fixable,
         });
         return Ok(CommandOutcome::DoctorReport(obj.to_string()));
     }
 
-    let report = format!(
-        "Tantra System Diagnostic & Health Report:\n\
-         • Workspace Root:        {}\n\
-         • Local State Directory: {} [{}]\n\
-         • Market Lakehouse:      {} [{}]\n\
-         • SEBI Pre-Trade Risk:   ONLINE (<15 µs p99 execution gate)\n\
-         • In-Process LLM:        Candle GGUF SmolLM2 (pure Rust inference)\n\
-         • Remote LLM Provider:   OpenAI-compatible HTTP streaming ready\n\
-         • Python FFI & Zero-Copy: OK (PyO3 Arrow bridge)\n\
-         Overall Status: HEALTHY",
-        std::env::current_dir().unwrap_or_default().display(),
+    let mut report = format!("Tantra system diagnostic (home: {})\n", home.display());
+    report.push_str(&format!(
+        "home_dir      {}  [{}]\n",
         home.display(),
-        if home.exists() {
-            "OK"
-        } else {
-            "MISSING (run --fix)"
-        },
+        if home_ok { "OK" } else { "MISSING" },
+    ));
+    report.push_str(&format!(
+        "lakehouse     {}  [{}]\n",
         lakehouse.display(),
-        if lakehouse.exists() {
-            "OK"
-        } else {
-            "MISSING (run --fix)"
-        }
-    );
-
+        if lakehouse_ok { "OK" } else { "MISSING" },
+    ));
+    report.push_str(&format!(
+        "cache         {}  [{}]\n",
+        cache.display(),
+        if cache_ok { "OK" } else { "MISSING" },
+    ));
+    report.push_str(&format!(
+        "model         {}  [{}]\n",
+        model.as_deref().unwrap_or("(none)"),
+        if model.is_some() { "OK" } else { "MISSING" },
+    ));
+    report.push_str(&format!(
+        "env           TANTRA_HOME/HOME  [{}]\n",
+        if home_env_ok { "OK" } else { "MISSING" },
+    ));
+    report.push_str("Missing directories can be provisioned with `tantra doctor --fix`.");
     Ok(CommandOutcome::DoctorReport(report))
 }
 
-fn run_purge(args: &PurgeArgs) -> Result<CommandOutcome, CliError> {
-    let home = tantra_home_dir();
-    let cache = home.join("cache");
-    let tmp = home.join("tmp");
+/// Discover a GGUF model file, mirroring `resolve_provider`'s lookup: the
+/// `TANTRA_GGUF_PATH` env var first, then `models/*.gguf` in the cwd.
+fn discover_model_file() -> Option<String> {
+    if let Ok(env_path) = std::env::var(ENV_GGUF_PATH) {
+        if !env_path.trim().is_empty() && Path::new(&env_path).exists() {
+            return Some(env_path);
+        }
+    }
+    let Ok(rd) = fs::read_dir("models") else {
+        return None;
+    };
+    for entry in rd.flatten() {
+        let p = entry.path();
+        if p.is_file() && p.extension().and_then(|e| e.to_str()) == Some("gguf") {
+            return Some(p.display().to_string());
+        }
+    }
+    None
+}
 
-    // Quantcept convention: Deletes ~/.quantcept and ~/.learnings. Refuses unless --yes is set.
+fn run_purge(args: &PurgeArgs) -> Result<CommandOutcome, CliError> {
+    run_purge_with_home(&tantra_home_dir(), args)
+}
+
+/// Runs a `tantra purge` against an explicit home directory.
+///
+/// Real deletion of `home/cache`, `home/tmp`, and `$HOME/.learnings`; refuses
+/// without `--yes` or `--dry-run`. `--dry-run` lists only paths that exist.
+pub fn run_purge_with_home(home: &Path, args: &PurgeArgs) -> Result<CommandOutcome, CliError> {
+    // Quantcept convention: refuses non-interactive purge without confirmation.
     if !args.yes && !args.dry_run {
         return Err(CliError::Execution(
             "Purge refuses to run non-interactively without --yes confirmation. Use `tantra purge --dry-run` to preview.".to_string(),
         ));
     }
 
-    if args.dry_run {
-        return Ok(CommandOutcome::PurgeSuccess(format!(
-            "Purge dry-run preview (no files removed):\n\
-             • Would remove: {}\n\
-             • Would remove: {}\n\
-             • Would remove: ~/.learnings\n\
-             User configuration and persistent ledger entries will NOT be touched.",
-            cache.display(),
-            tmp.display()
-        )));
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    let cache = home.join("cache");
+    let tmp = home.join("tmp");
+    if cache.exists() {
+        candidates.push(cache);
     }
-
-    let _ = fs::remove_dir_all(&cache);
-    let _ = fs::remove_dir_all(&tmp);
+    if tmp.exists() {
+        candidates.push(tmp);
+    }
     if let Ok(user_home) = std::env::var("HOME") {
         let learnings = PathBuf::from(user_home).join(".learnings");
-        let _ = fs::remove_dir_all(&learnings);
+        if learnings.exists() {
+            candidates.push(learnings);
+        }
     }
 
-    Ok(CommandOutcome::PurgeSuccess(
-        "Purged temporary caches, session traces, and ephemeral data. Configuration preserved."
-            .to_string(),
-    ))
+    if args.dry_run {
+        let mut out = String::from("Purge dry-run preview (no files removed):\n");
+        if candidates.is_empty() {
+            out.push_str("• Nothing to purge: no caches or temporary artifacts exist.");
+        } else {
+            for p in &candidates {
+                out.push_str(&format!("• Would remove: {}\n", p.display()));
+            }
+        }
+        out.push_str("\nUser configuration and persistent ledger entries will NOT be touched.");
+        return Ok(CommandOutcome::PurgeSuccess(out));
+    }
+
+    let mut removed: Vec<String> = Vec::new();
+    for p in &candidates {
+        if fs::remove_dir_all(p).is_ok() {
+            removed.push(p.display().to_string());
+        }
+    }
+    let mut out = format!("Purged {count} path(s):\n", count = removed.len());
+    for r in &removed {
+        out.push_str(&format!("• removed: {r}\n"));
+    }
+    out.push_str("Configuration and persistent ledger entries preserved.");
+    Ok(CommandOutcome::PurgeSuccess(out))
 }
 
 fn run_health() -> Result<CommandOutcome, CliError> {
-    Ok(CommandOutcome::HealthReport(
-        "tantra: healthy (tui ready, ask/chat wired to Candle GGUF, scan pending universe)"
-            .to_string(),
-    ))
+    run_health_with_home(&tantra_home_dir())
+}
+
+/// Emit a factual health report for what this CLI genuinely wires, given an
+/// explicit home directory.
+pub fn run_health_with_home(home: &Path) -> Result<CommandOutcome, CliError> {
+    let memory_notes = crate::memory_store::load_entries(&home.join("memory")).len();
+    let plugin_count = count_installed_plugins(&home.join("plugins"));
+    let skill_count = count_installed_skills(&home.join("skills"));
+    let mcp_count = load_mcp_servers(&home.join("mcp").join("servers.toml"))
+        .map(|rows| rows.len())
+        .unwrap_or(0);
+    let report = format!(
+        "tantra: healthy\n\
+         home      {home_disp}\n\
+         tui       ready (ratatui 7-tab workstation)\n\
+         ask/chat  wired (Candle GGUF / OpenAI-compatible endpoints)\n\
+         scan      wired (canonical screener evaluator; live `tantra scan --server <url>`)\n\
+         serve     wired (tantra-runtime-api-rest, incl. GET /screener/scan)\n\
+         jobs      wired (FileJobRegistry + journal)\n\
+         memory    {memory_notes} note(s) at {home_disp}/memory\n\
+         plugin    {plugin_count} disk plugin(s) at {home_disp}/plugins\n\
+         skills    {skill_count} skill(s) at {home_disp}/skills\n\
+         mcp       {mcp_count} server(s) at {home_disp}/mcp\n\
+         doctor    `tantra doctor --fix --json`",
+        home_disp = home.display(),
+    );
+    Ok(CommandOutcome::HealthReport(report))
+}
+
+fn count_installed_plugins(plugins_dir: &Path) -> usize {
+    let Ok(rd) = fs::read_dir(plugins_dir) else {
+        return 0;
+    };
+    rd.flatten()
+        .filter(|e| e.path().is_dir() && e.path().join("manifest.toml").is_file())
+        .count()
+}
+
+fn count_installed_skills(skills_dir: &Path) -> usize {
+    let Ok(rd) = fs::read_dir(skills_dir) else {
+        return 0;
+    };
+    rd.flatten()
+        .filter(|e| e.path().is_dir() && e.path().join("SKILL.md").is_file())
+        .count()
+}
+
+/// A parsed plugin `manifest.toml`.
+#[derive(serde::Deserialize)]
+struct PluginManifest {
+    name: String,
+    version: String,
+    description: String,
+}
+
+/// A marketplace source row (`<home>/plugins/sources.toml`).
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+struct PluginSource {
+    name: String,
+    url: String,
+    enabled: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PluginSourcesFile {
+    #[serde(default, rename = "sources")]
+    sources: Vec<PluginSource>,
+}
+
+fn load_plugin_sources(path: &Path) -> Result<Vec<PluginSource>, CliError> {
+    let Ok(content) = fs::read_to_string(path) else {
+        return Ok(Vec::new());
+    };
+    let file: PluginSourcesFile = toml::from_str(&content)
+        .map_err(|e| CliError::Execution(format!("invalid {}: {e}", path.display())))?;
+    Ok(file.sources)
+}
+
+fn save_plugin_sources(path: &Path, sources: &[PluginSource]) -> Result<(), CliError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| CliError::Execution(format!("cannot create {}: {e}", parent.display())))?;
+    }
+    let out = toml::to_string(&PluginSourcesFile {
+        sources: sources.to_vec(),
+    })
+    .map_err(|e| CliError::Execution(format!("cannot serialize plugin sources: {e}")))?;
+    fs::write(path, out)
+        .map_err(|e| CliError::Execution(format!("cannot write {}: {e}", path.display())))
+}
+
+/// A connected MCP server row (`<home>/mcp/servers.toml`).
+#[derive(serde::Serialize, serde::Deserialize, Clone)]
+struct McpServerRow {
+    name: String,
+    command: String,
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct McpServersFile {
+    #[serde(default, rename = "servers")]
+    servers: Vec<McpServerRow>,
+}
+
+fn load_mcp_servers(path: &Path) -> Result<Vec<McpServerRow>, CliError> {
+    let Ok(content) = fs::read_to_string(path) else {
+        return Ok(Vec::new());
+    };
+    let file: McpServersFile = toml::from_str(&content)
+        .map_err(|e| CliError::Execution(format!("invalid {}: {e}", path.display())))?;
+    Ok(file.servers)
+}
+
+fn save_mcp_servers(path: &Path, servers: &[McpServerRow]) -> Result<(), CliError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|e| CliError::Execution(format!("cannot create {}: {e}", parent.display())))?;
+    }
+    let out = toml::to_string(&McpServersFile {
+        servers: servers.to_vec(),
+    })
+    .map_err(|e| CliError::Execution(format!("cannot serialize servers.toml: {e}")))?;
+    fs::write(path, out)
+        .map_err(|e| CliError::Execution(format!("cannot write {}: {e}", path.display())))
 }
 
 fn run_strategy(args: &StrategyArgs) -> Result<CommandOutcome, CliError> {

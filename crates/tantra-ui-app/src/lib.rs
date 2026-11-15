@@ -10,7 +10,8 @@
 //! - **Zero-floats**: every financial value is `rust_decimal::Decimal`.
 //! - **Feature/state separation**: each feature module owns its *reactive
 //!   state* and transitions; presentational primitives come from
-//!   `tantra-ui-core`. Rendering (Leptos, canvas) is left to the host.
+//!   `tantra-ui-core`. The Leptos 0.8 CSR view layer (`web`) renders the
+//!   eight `AppRoute` views from those feature-state models.
 //! - **Tests in `tests/`** (parallel test directory rule).
 
 pub mod algos;
@@ -22,6 +23,7 @@ pub mod simulator;
 pub mod studio;
 pub mod system;
 pub mod watchlist;
+pub mod web;
 
 pub use algos::AlgosFeature;
 pub use backtest::BacktestFeature;

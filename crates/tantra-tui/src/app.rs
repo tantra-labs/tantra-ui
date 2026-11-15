@@ -10,6 +10,7 @@ use tantra_ui_core::strategy::{
 
 use crate::agent_chat::{AgentMessage, AgentRole, ChatTranscript};
 use crate::keybindings::{Action, handle_key};
+use crate::live_data::LiveData;
 
 /// The workstation tabs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -246,6 +247,8 @@ pub struct TuiApp {
     pub active_tab: ActiveTab,
     /// Whether the user requested to quit.
     pub should_quit: bool,
+    /// Live-data state fed by canonical `ClientEvent`s (gap 0005).
+    pub live: LiveData,
     /// The agent chat transcript.
     pub chat: ChatTranscript,
     /// Index of the selected row in the active data tab.
@@ -357,6 +360,7 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
         Self {
             active_tab: ActiveTab::Watchlist,
             should_quit: false,
+            live: LiveData::new(),
             chat,
             selected_index: 0,
             input_buffer: String::new(),
@@ -377,6 +381,14 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
             optimization_result,
             trade_suggestion,
         }
+    }
+
+    /// Publish a canonical client event into the live-data state (gap 0005
+    /// wiring seam). A feed consumer (e.g. a tokio task draining an
+    /// `EventStream`) pushes events here each frame; the render path only
+    /// ever reads `self.live`.
+    pub fn publish(&mut self, ev: tantra_ui_client::ClientEvent) {
+        self.live.apply_event(&ev);
     }
 
     /// Set model name display.

@@ -177,24 +177,9 @@ fn draw_tabs(frame: &mut Frame, area: Rect, app: &TuiApp) {
 fn draw_content(frame: &mut Frame, area: Rect, app: &TuiApp) {
     match app.active_tab {
         ActiveTab::Watchlist => draw_watchlist(frame, area, app),
-        ActiveTab::Screener => draw_placeholder(
-            frame,
-            area,
-            "Neural AST Screener",
-            "Vectorized query filter over 4,000 Arrow fields (P/E, ROCE, RSI, 52W).",
-        ),
-        ActiveTab::Portfolio => draw_placeholder(
-            frame,
-            area,
-            "Portfolio Snapshot",
-            "FIFO tax-lots, unrealized STCG/LTCG, and real-time MTM valuation.",
-        ),
-        ActiveTab::Orders => draw_placeholder(
-            frame,
-            area,
-            "Orders & OMS",
-            "Live order book state machine with SEBI pre-trade risk validation.",
-        ),
+        ActiveTab::Screener => draw_screener(frame, area, app),
+        ActiveTab::Portfolio => draw_portfolio(frame, area, app),
+        ActiveTab::Orders => draw_orders(frame, area, app),
         ActiveTab::Backtest => draw_backtest(frame, area, app),
         ActiveTab::Algos => draw_algos(frame, area, app),
         ActiveTab::AgentChat => draw_agent_chat(frame, area, app),
@@ -332,11 +317,23 @@ fn draw_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
     frame.render_widget(p, popup_area);
 }
 
-fn draw_watchlist(frame: &mut Frame, area: Rect, _app: &TuiApp) {
+fn draw_watchlist(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray))
         .title(" Watchlist — Indian Equities & Indices (NSE) ");
+
+    if app.live.watchlist.is_empty() {
+        render_empty_state(
+            frame,
+            area,
+            block,
+            "No live market data. Boot `tantra serve <data_dir>` and publish \
+             `ClientEvent`s to an `EventStream`, or seed `TuiApp.live` \
+             (gap 0005 wiring seam).",
+        );
+        return;
+    }
 
     let header = Row::new(vec!["Symbol", "Instrument", "LTP (₹)", "Change", "Volume"]).style(
         Style::default()
@@ -344,64 +341,26 @@ fn draw_watchlist(frame: &mut Frame, area: Rect, _app: &TuiApp) {
             .add_modifier(Modifier::BOLD),
     );
 
-    let rows = vec![
-        Row::new(vec![
-            "NIFTY 50",
-            "Index",
-            "24,148.20",
-            "+124.50 (+0.52%)",
-            "482.1M",
-        ])
-        .style(Style::default().fg(Color::Green)),
-        Row::new(vec![
-            "BANKNIFTY",
-            "Index",
-            "51,885.10",
-            "-78.20 (-0.15%)",
-            "215.4M",
-        ])
-        .style(Style::default().fg(Color::Red)),
-        Row::new(vec![
-            "RELIANCE",
-            "NSE Equity",
-            "2,980.50",
-            "+34.00 (+1.15%)",
-            "8.4M",
-        ])
-        .style(Style::default().fg(Color::Green)),
-        Row::new(vec![
-            "TCS",
-            "NSE Equity",
-            "4,120.00",
-            "-12.50 (-0.30%)",
-            "2.9M",
-        ])
-        .style(Style::default().fg(Color::Red)),
-        Row::new(vec![
-            "HDFCBANK",
-            "NSE Equity",
-            "1,648.75",
-            "+5.10 (+0.31%)",
-            "14.2M",
-        ])
-        .style(Style::default().fg(Color::Green)),
-        Row::new(vec![
-            "INFY",
-            "NSE Equity",
-            "1,822.30",
-            "-4.40 (-0.24%)",
-            "6.1M",
-        ])
-        .style(Style::default().fg(Color::Red)),
-        Row::new(vec![
-            "ICICIBANK",
-            "NSE Equity",
-            "1,265.40",
-            "+8.30 (+0.66%)",
-            "11.7M",
-        ])
-        .style(Style::default().fg(Color::Green)),
-    ];
+    let rows: Vec<Row> = app
+        .live
+        .watchlist
+        .iter()
+        .map(|w| {
+            let color = if w.change >= Decimal::ZERO {
+                Color::Green
+            } else {
+                Color::Red
+            };
+            Row::new(vec![
+                w.symbol.clone(),
+                "NSE".to_string(),
+                format!("₹{:.2}", w.last),
+                format!("{:+.2} ({:+.2}%)", w.change, w.change_pct),
+                format!("{}", w.volume),
+            ])
+            .style(Style::default().fg(color))
+        })
+        .collect();
 
     let widths = [
         Constraint::Length(14),
@@ -415,34 +374,205 @@ fn draw_watchlist(frame: &mut Frame, area: Rect, _app: &TuiApp) {
     frame.render_widget(table, area);
 }
 
-fn draw_placeholder(frame: &mut Frame, area: Rect, title: &str, description: &str) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(format!(" {title} "));
-
+/// Render an honest empty-state panel for a tab that has no live data yet.
+fn render_empty_state(frame: &mut Frame, area: Rect, block: Block<'static>, message: &str) {
     let text = vec![
         Line::from(""),
         Line::from(vec![Span::styled(
-            format!("  {title}"),
+            "  No data yet.",
             Style::default()
-                .fg(Color::Cyan)
+                .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         )]),
-        Line::from(""),
         Line::from(vec![Span::styled(
-            format!("  {description}"),
+            format!("  {message}"),
             Style::default().fg(Color::White),
         )]),
-        Line::from(""),
         Line::from(vec![Span::styled(
-            "  Tip: Switch to the Agent tab (press '7' or Tab) to chat, or press '/' / Ctrl+P for slash commands.",
+            "  Live data arrives as canonical `ClientEvent`s published to \
+             `TuiApp::publish` (gap 0005 wiring seam).",
             Style::default().fg(Color::DarkGray),
         )]),
     ];
 
     let p = Paragraph::new(text).block(block);
     frame.render_widget(p, area);
+}
+
+fn draw_screener(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray))
+        .title(" Neural AST Screener — Scan Results ");
+
+    if app.live.screener.is_empty() {
+        render_empty_state(
+            frame,
+            area,
+            block,
+            "No scan results yet. Publish a `ClientEvent::Screener` \
+             (ScreenerScanResponse) to the live-data seam.",
+        );
+        return;
+    }
+
+    let header = Row::new(vec![
+        "Instrument",
+        "Metric 1",
+        "Metric 2",
+        "Metric 3",
+        "Metric 4",
+    ])
+    .style(
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    );
+
+    let rows: Vec<Row> = app
+        .live
+        .screener
+        .iter()
+        .map(|hit| {
+            let mut cells = vec![hit.instrument.clone()];
+            for (name, value) in hit.metrics.iter().take(4) {
+                cells.push(format!("{name}: {value}"));
+            }
+            while cells.len() < 5 {
+                cells.push(String::new());
+            }
+            Row::new(cells).style(Style::default().fg(Color::White))
+        })
+        .collect();
+
+    let widths = [
+        Constraint::Percentage(25),
+        Constraint::Percentage(25),
+        Constraint::Percentage(25),
+        Constraint::Percentage(25),
+        Constraint::Percentage(25),
+    ];
+
+    let table = Table::new(rows, widths).header(header).block(block);
+    frame.render_widget(table, area);
+}
+
+fn draw_portfolio(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray))
+        .title(" Portfolio Snapshot ");
+
+    let Some(portfolio) = &app.live.portfolio else {
+        render_empty_state(
+            frame,
+            area,
+            block,
+            "No portfolio snapshot yet. Publish a `ClientEvent::Portfolio` \
+             (PortfolioSnapshot) to the live-data seam.",
+        );
+        return;
+    };
+
+    let pnl_color = if portfolio.total_pnl >= Decimal::ZERO {
+        Color::Green
+    } else {
+        Color::Red
+    };
+    let pnl_sign = if portfolio.total_pnl >= Decimal::ZERO {
+        "+"
+    } else {
+        ""
+    };
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(vec![
+            Span::styled("  Cash:          ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("₹{:.2}", portfolio.cash),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Net Worth:     ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("₹{:.2}", portfolio.net_worth),
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Total PnL:     ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{pnl_sign}{:.2}", portfolio.total_pnl),
+                Style::default().fg(pnl_color).add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(vec![
+            Span::styled("  Open Positions:", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                format!("{}", portfolio.positions),
+                Style::default()
+                    .fg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        ]),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  FIFO tax-lots, unrealized STCG/LTCG, and real-time MTM valuation.",
+            Style::default().fg(Color::DarkGray),
+        )),
+    ];
+
+    let p = Paragraph::new(lines).block(block);
+    frame.render_widget(p, area);
+}
+
+fn draw_orders(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray))
+        .title(" Orders & OMS ");
+
+    if app.live.orders.is_empty() {
+        render_empty_state(
+            frame,
+            area,
+            block,
+            "No order activity yet. Publish `ClientEvent::Order` / \
+             `ClientEvent::Fill` events to the live-data seam.",
+        );
+        return;
+    }
+
+    let header = Row::new(vec!["Order ID", "Kind", "Status"]).style(
+        Style::default()
+            .fg(Color::Cyan)
+            .add_modifier(Modifier::BOLD),
+    );
+
+    let rows: Vec<Row> = app
+        .live
+        .orders
+        .iter()
+        .map(|o| {
+            Row::new(vec![o.order_id.clone(), o.kind.clone(), o.status.clone()])
+                .style(Style::default().fg(Color::White))
+        })
+        .collect();
+
+    let widths = [
+        Constraint::Percentage(40),
+        Constraint::Percentage(20),
+        Constraint::Percentage(40),
+    ];
+
+    let table = Table::new(rows, widths).header(header).block(block);
+    frame.render_widget(table, area);
 }
 
 fn draw_footer(frame: &mut Frame, area: Rect, _app: &TuiApp) {

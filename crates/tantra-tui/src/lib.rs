@@ -24,6 +24,7 @@ pub mod agent_chat;
 pub mod app;
 pub mod keybindings;
 pub mod layout;
+pub mod live_data;
 pub mod terminal;
 pub mod ui;
 

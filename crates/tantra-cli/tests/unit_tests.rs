@@ -11,7 +11,11 @@ use tantra_cli::args::{
     MarketplaceArgs, McpArgs, MemoryArgs, OutputFormat, PluginArgs, PurgeArgs, ScanArgs, ServeArgs,
     SkillsArgs, VerifyArgs, resolve_log_level,
 };
-use tantra_cli::runner::{CliError, CommandOutcome, run, run_jobs_with_home, run_with_provider};
+use tantra_cli::runner::{
+    CliError, CommandOutcome, run, run_doctor_with_home, run_health_with_home, run_jobs_with_home,
+    run_mcp_with_home, run_memory_with_home, run_plugin_with_home, run_purge_with_home,
+    run_skills_with_home, run_with_provider,
+};
 use tantra_cli::scan::{parse_query, scan_universe};
 use tantra_core::screener::{FilterOp, ScreenerScanRequest};
 
@@ -111,6 +115,10 @@ fn parse_cli_roundtrip_scan() {
     let cli = Cli {
         command: Some(CliCommand::Scan {
             query: "roe>15".into(),
+            server: Some("http://127.0.0.1:8000".into()),
+            universe: Some(r#"["TCS.NSE","INFY.NSE"]"#.into()),
+            tf: Some("1d".into()),
+            as_of: Some("2024-01-05".into()),
         }),
         ..Default::default()
     };
@@ -118,7 +126,11 @@ fn parse_cli_roundtrip_scan() {
     assert_eq!(
         args.command,
         Command::Scan(ScanArgs {
-            query: "roe>15".into()
+            query: "roe>15".into(),
+            server: Some("http://127.0.0.1:8000".into()),
+            universe: Some(r#"["TCS.NSE","INFY.NSE"]"#.into()),
+            tf: Some("1d".into()),
+            as_of: Some("2024-01-05".into()),
         })
     );
 }
@@ -257,6 +269,7 @@ fn run_scan_returns_matching_rows() {
     let cli = CliArgs {
         command: Command::Scan(ScanArgs {
             query: "pe<25".into(),
+            ..Default::default()
         }),
         ..Default::default()
     };
@@ -273,6 +286,7 @@ fn run_scan_returns_zero_rows_when_no_match() {
     let cli = CliArgs {
         command: Command::Scan(ScanArgs {
             query: "pe<5".into(),
+            ..Default::default()
         }),
         ..Default::default()
     };
@@ -290,6 +304,7 @@ fn run_scan_compound_and_query() {
     let cli = CliArgs {
         command: Command::Scan(ScanArgs {
             query: "roe>15 and pe<30".into(),
+            ..Default::default()
         }),
         ..Default::default()
     };
@@ -304,7 +319,10 @@ fn run_scan_compound_and_query() {
 #[test]
 fn run_scan_rejects_empty_query() {
     let cli = CliArgs {
-        command: Command::Scan(ScanArgs { query: "".into() }),
+        command: Command::Scan(ScanArgs {
+            query: "".into(),
+            ..Default::default()
+        }),
         ..Default::default()
     };
     assert_eq!(
@@ -373,7 +391,8 @@ fn run_health_reports_environment() {
     match outcome {
         CommandOutcome::HealthReport(report) => {
             assert!(report.contains("tantra"));
-            assert!(report.contains("tui ready"));
+            assert!(report.contains("tui"));
+            assert!(report.contains("scan"));
         }
         other => panic!("expected health report, got {other:?}"),
     }
@@ -381,18 +400,25 @@ fn run_health_reports_environment() {
 
 #[test]
 fn run_doctor_reports_diagnostics() {
-    let cli = CliArgs {
-        command: Command::Doctor(DoctorArgs {
+    // A fresh home dir has no lakehouse/cache: the text report must say so
+    // honestly ([MISSING]) instead of canned "healthy" prose.
+    let temp = tempfile::tempdir().unwrap();
+    let outcome = run_doctor_with_home(
+        temp.path(),
+        &DoctorArgs {
             fix: false,
-            json: true,
-        }),
-        ..Default::default()
-    };
-    let outcome = run(&cli).unwrap();
+            json: false,
+        },
+    )
+    .unwrap();
     match outcome {
         CommandOutcome::DoctorReport(report) => {
-            assert!(report.contains("healthy"));
-            assert!(report.contains("SEBI pre-trade"));
+            assert!(report.contains("Tantra system diagnostic"), "{report}");
+            assert!(report.contains("[OK]"), "home_dir exists: {report}");
+            assert!(
+                report.contains("[MISSING]"),
+                "lakehouse/cache absent: {report}"
+            );
         }
         other => panic!("expected doctor report, got {other:?}"),
     }
@@ -567,38 +593,32 @@ fn run_verify_missing_file_returns_file_error() {
 
 #[test]
 fn run_memory_and_plugin_commands() {
-    let mem_cli = CliArgs {
-        command: Command::Memory(MemoryArgs::Stats),
-        ..Default::default()
-    };
-    let outcome = run(&mem_cli).unwrap();
-    match outcome {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+
+    let mem = run_memory_with_home(&MemoryArgs::Stats, home).unwrap();
+    match mem {
         CommandOutcome::MemorySuccess(stats) => {
             assert!(stats.contains("Local Semantic Memory"));
+            assert!(stats.contains("0 notes, 0 active semantic facts"));
         }
         other => panic!("expected MemorySuccess, got {other:?}"),
     }
 
-    let plug_cli = CliArgs {
-        command: Command::Plugin(PluginArgs::List),
-        ..Default::default()
-    };
-    let outcome = run(&plug_cli).unwrap();
-    match outcome {
+    let plug = run_plugin_with_home(&PluginArgs::List, home).unwrap();
+    match plug {
         CommandOutcome::PluginSuccess(list) => {
             assert!(list.contains("Installed plugins"));
+            assert!(list.contains("(builtin)"));
         }
         other => panic!("expected PluginSuccess, got {other:?}"),
     }
 
-    let market_cli = CliArgs {
-        command: Command::Plugin(PluginArgs::Marketplace(MarketplaceArgs::List)),
-        ..Default::default()
-    };
-    let outcome = run(&market_cli).unwrap();
-    match outcome {
+    let market =
+        run_plugin_with_home(&PluginArgs::Marketplace(MarketplaceArgs::List), home).unwrap();
+    match market {
         CommandOutcome::PluginSuccess(list) => {
-            assert!(list.contains("Marketplace"));
+            assert!(list.contains("No marketplace sources configured"), "{list}");
         }
         other => panic!("expected Marketplace, got {other:?}"),
     }
@@ -606,31 +626,24 @@ fn run_memory_and_plugin_commands() {
 
 #[test]
 fn run_skills_and_mcp_commands() {
-    let skills_cli = CliArgs {
-        command: Command::Skills(SkillsArgs::List),
-        ..Default::default()
-    };
-    let outcome = run(&skills_cli).unwrap();
-    match outcome {
-        CommandOutcome::SkillsSuccess(skills) => {
-            assert!(skills.contains("The 8 Quant Desks"));
-            assert!(skills.contains("quant"));
-            assert!(skills.contains("analyst"));
-            assert!(skills.contains("trader"));
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+
+    // A fresh home has no skills: the list must say so honestly rather than
+    // printing a canned 8-persona catalog.
+    let skills = run_skills_with_home(&SkillsArgs::List, home).unwrap();
+    match skills {
+        CommandOutcome::SkillsSuccess(msg) => {
+            assert!(msg.contains("No skills installed under"), "{msg}");
         }
         other => panic!("expected SkillsSuccess, got {other:?}"),
     }
 
-    let mcp_cli = CliArgs {
-        command: Command::Mcp(McpArgs::List),
-        ..Default::default()
-    };
-    let outcome = run(&mcp_cli).unwrap();
-    match outcome {
-        CommandOutcome::McpSuccess(mcp) => {
-            assert!(mcp.contains("MCP"));
-            assert!(mcp.contains("context7"));
-            assert!(mcp.contains("github"));
+    // The builtin stdio server is always listed; disk rows are absent.
+    let mcp = run_mcp_with_home(&McpArgs::List, home).unwrap();
+    match mcp {
+        CommandOutcome::McpSuccess(msg) => {
+            assert!(msg.contains("tantra"), "builtin stdio server: {msg}");
         }
         other => panic!("expected McpSuccess, got {other:?}"),
     }
@@ -672,5 +685,437 @@ fn test_run_ask_backtest_synthesis() {
             assert!(std::path::Path::new("backtest_alpha30.py").exists());
         }
         other => panic!("expected Answer with backtest report, got {other:?}"),
+    }
+}
+
+// ── T10.1 (gap ui 0003): real on-disk command reports ────────────────────────
+// Every test drives the `*_with_home` entry points against a `tempfile` home so
+// the assertions reflect genuine filesystem state, not canned output.
+
+#[test]
+fn run_memory_import_then_stats_counts_real_entries() {
+    let temp = tempfile::tempdir().unwrap();
+    let docs = temp.path().join("notes");
+    fs::create_dir_all(&docs).unwrap();
+    fs::write(
+        docs.join("alpha.md"),
+        "# Alpha\nMomentum factor study for Nifty midcaps.",
+    )
+    .unwrap();
+
+    let import =
+        run_memory_with_home(&MemoryArgs::Import { path: Some(docs) }, temp.path()).unwrap();
+    match import {
+        CommandOutcome::MemorySuccess(msg) => {
+            assert!(msg.contains("Imported 1 note(s)"), "{msg}");
+        }
+        other => panic!("expected MemorySuccess, got {other:?}"),
+    }
+
+    let stats = run_memory_with_home(&MemoryArgs::Stats, temp.path()).unwrap();
+    match stats {
+        CommandOutcome::MemorySuccess(msg) => {
+            assert!(msg.contains("1 notes, 1 active semantic facts"), "{msg}");
+            assert!(msg.contains("KB"), "{msg}");
+        }
+        other => panic!("expected MemorySuccess, got {other:?}"),
+    }
+
+    // The store is really on disk: one JSONL record exists.
+    assert_eq!(
+        tantra_cli::memory_store::load_entries(&temp.path().join("memory")).len(),
+        1
+    );
+}
+
+#[test]
+fn run_memory_import_missing_path_is_file_error() {
+    let temp = tempfile::tempdir().unwrap();
+    let err = run_memory_with_home(
+        &MemoryArgs::Import {
+            path: Some(temp.path().join("nope")),
+        },
+        temp.path(),
+    );
+    assert!(matches!(err, Err(CliError::MissingFile(_))));
+}
+
+#[test]
+fn run_memory_model_set_and_read_roundtrip() {
+    let temp = tempfile::tempdir().unwrap();
+    let set = run_memory_with_home(
+        &MemoryArgs::Model {
+            name: Some("nomic-embed".into()),
+        },
+        temp.path(),
+    )
+    .unwrap();
+    assert!(matches!(set, CommandOutcome::MemorySuccess(_)));
+
+    let read = run_memory_with_home(&MemoryArgs::Model { name: None }, temp.path()).unwrap();
+    match read {
+        CommandOutcome::MemorySuccess(msg) => assert!(msg.contains("nomic-embed"), "{msg}"),
+        other => panic!("expected MemorySuccess, got {other:?}"),
+    }
+}
+
+#[test]
+fn run_memory_tick_distills_session_transcripts() {
+    let temp = tempfile::tempdir().unwrap();
+    let sessions = temp.path().join("sessions");
+    fs::create_dir_all(&sessions).unwrap();
+    fs::write(sessions.join("ses_abc.jsonl"), "{\"role\":\"user\"}\n").unwrap();
+    fs::write(sessions.join("ses_def.jsonl"), "{\"role\":\"assistant\"}\n").unwrap();
+
+    let out = run_memory_with_home(&MemoryArgs::Tick, temp.path()).unwrap();
+    match out {
+        CommandOutcome::MemorySuccess(msg) => {
+            assert!(
+                msg.contains("distilled 2 session transcript(s) into 2 memory note(s)"),
+                "{msg}"
+            );
+        }
+        other => panic!("expected MemorySuccess, got {other:?}"),
+    }
+    assert_eq!(
+        tantra_cli::memory_store::load_entries(&temp.path().join("memory")).len(),
+        2
+    );
+}
+
+#[test]
+fn run_plugin_install_list_disable_enable_validate() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+
+    let install = run_plugin_with_home(
+        &PluginArgs::Install {
+            name: "alpha-flow".into(),
+        },
+        home,
+    )
+    .unwrap();
+    assert!(matches!(install, CommandOutcome::PluginSuccess(_)));
+
+    // Disk-installed plugins are listed as enabled, next to the builtins.
+    let list = run_plugin_with_home(&PluginArgs::List, home).unwrap();
+    match list {
+        CommandOutcome::PluginSuccess(msg) => {
+            assert!(msg.contains("alpha-flow (enabled)"), "{msg}");
+            assert!(msg.contains("(builtin)"), "{msg}");
+        }
+        other => panic!("expected PluginSuccess, got {other:?}"),
+    }
+
+    let disable = run_plugin_with_home(
+        &PluginArgs::Disable {
+            name: "alpha-flow".into(),
+        },
+        home,
+    )
+    .unwrap();
+    assert!(matches!(disable, CommandOutcome::PluginSuccess(_)));
+    let list = run_plugin_with_home(&PluginArgs::List, home).unwrap();
+    match list {
+        CommandOutcome::PluginSuccess(msg) => {
+            assert!(msg.contains("alpha-flow (disabled)"), "{msg}");
+        }
+        other => panic!("expected PluginSuccess, got {other:?}"),
+    }
+
+    let enable = run_plugin_with_home(
+        &PluginArgs::Enable {
+            name: "alpha-flow".into(),
+        },
+        home,
+    )
+    .unwrap();
+    assert!(matches!(enable, CommandOutcome::PluginSuccess(_)));
+
+    let validate = run_plugin_with_home(
+        &PluginArgs::Validate {
+            path: Some(home.join("plugins/alpha-flow")),
+        },
+        home,
+    )
+    .unwrap();
+    match validate {
+        CommandOutcome::PluginSuccess(msg) => {
+            assert!(msg.contains("Validated plugin manifest"), "{msg}");
+        }
+        other => panic!("expected PluginSuccess, got {other:?}"),
+    }
+
+    // Re-installing an existing plugin and touching an absent one are honest errors.
+    let dup = run_plugin_with_home(
+        &PluginArgs::Install {
+            name: "alpha-flow".into(),
+        },
+        home,
+    );
+    assert!(dup.is_err());
+    let uninstall_missing = run_plugin_with_home(
+        &PluginArgs::Uninstall {
+            name: "ghost".into(),
+        },
+        home,
+    );
+    assert!(uninstall_missing.is_err());
+}
+
+#[test]
+fn run_plugin_marketplace_add_list_remove_roundtrip() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+    let src = "alpha=https://hub.tantra.dev/alpha".to_string();
+
+    let add = run_plugin_with_home(
+        &PluginArgs::Marketplace(MarketplaceArgs::Add {
+            source: src.clone(),
+        }),
+        home,
+    )
+    .unwrap();
+    assert!(matches!(add, CommandOutcome::PluginSuccess(_)));
+
+    let list = run_plugin_with_home(&PluginArgs::Marketplace(MarketplaceArgs::List), home).unwrap();
+    match list {
+        CommandOutcome::PluginSuccess(msg) => {
+            assert!(
+                msg.contains("alpha") && msg.contains("hub.tantra.dev"),
+                "{msg}"
+            );
+        }
+        other => panic!("expected PluginSuccess, got {other:?}"),
+    }
+
+    let dup = run_plugin_with_home(
+        &PluginArgs::Marketplace(MarketplaceArgs::Add {
+            source: src.clone(),
+        }),
+        home,
+    );
+    assert!(dup.is_err(), "duplicate source must error");
+
+    let remove = run_plugin_with_home(
+        &PluginArgs::Marketplace(MarketplaceArgs::Remove {
+            name: "alpha".into(),
+        }),
+        home,
+    )
+    .unwrap();
+    assert!(matches!(remove, CommandOutcome::PluginSuccess(_)));
+
+    let gone = run_plugin_with_home(
+        &PluginArgs::Marketplace(MarketplaceArgs::Remove {
+            name: "alpha".into(),
+        }),
+        home,
+    );
+    assert!(gone.is_err(), "removing an absent source must error");
+}
+
+#[test]
+fn run_skills_empty_home_prints_honest_message() {
+    let temp = tempfile::tempdir().unwrap();
+    let out = run_skills_with_home(&SkillsArgs::List, temp.path()).unwrap();
+    match out {
+        CommandOutcome::SkillsSuccess(msg) => {
+            assert!(msg.contains("No skills installed under"), "{msg}");
+        }
+        other => panic!("expected SkillsSuccess, got {other:?}"),
+    }
+
+    let missing = run_skills_with_home(
+        &SkillsArgs::Show {
+            name: "quant".into(),
+        },
+        temp.path(),
+    );
+    assert!(matches!(missing, Err(CliError::MissingFile(_))));
+}
+
+#[test]
+fn run_skills_show_reads_real_skill_file() {
+    let temp = tempfile::tempdir().unwrap();
+    let skill_dir = temp.path().join("skills").join("quant");
+    fs::create_dir_all(&skill_dir).unwrap();
+    fs::write(
+        skill_dir.join("SKILL.md"),
+        "# Quant Desk\n\nLine two.\nLine three.\n",
+    )
+    .unwrap();
+
+    let show = run_skills_with_home(
+        &SkillsArgs::Show {
+            name: "quant".into(),
+        },
+        temp.path(),
+    )
+    .unwrap();
+    match show {
+        CommandOutcome::SkillsSuccess(msg) => assert!(msg.contains("# Quant Desk"), "{msg}"),
+        other => panic!("expected SkillsSuccess, got {other:?}"),
+    }
+
+    let list = run_skills_with_home(&SkillsArgs::List, temp.path()).unwrap();
+    match list {
+        CommandOutcome::SkillsSuccess(msg) => assert!(msg.contains("• quant"), "{msg}"),
+        other => panic!("expected SkillsSuccess, got {other:?}"),
+    }
+}
+
+#[test]
+fn run_mcp_connect_then_list_roundtrip() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+
+    let conn = run_mcp_with_home(
+        &McpArgs::Connect {
+            name: "context7".into(),
+            command: "npx @upstash/context7-mcp".into(),
+        },
+        home,
+    )
+    .unwrap();
+    assert!(matches!(conn, CommandOutcome::McpSuccess(_)));
+
+    let list = run_mcp_with_home(&McpArgs::List, home).unwrap();
+    match list {
+        CommandOutcome::McpSuccess(msg) => {
+            assert!(msg.contains("tantra"), "builtin stdio server: {msg}");
+            assert!(msg.contains("context7"), "{msg}");
+        }
+        other => panic!("expected McpSuccess, got {other:?}"),
+    }
+
+    let dup = run_mcp_with_home(
+        &McpArgs::Connect {
+            name: "context7".into(),
+            command: "npx @upstash/context7-mcp".into(),
+        },
+        home,
+    );
+    assert!(dup.is_err(), "duplicate MCP connect must error");
+}
+
+#[test]
+fn run_purge_dry_run_lists_only_existing_paths() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+    fs::create_dir_all(home.join("cache")).unwrap();
+    fs::write(home.join("cache/tick.parquet"), b"x").unwrap();
+    // home/tmp is deliberately absent.
+
+    let preview = run_purge_with_home(
+        home,
+        &PurgeArgs {
+            dry_run: true,
+            yes: false,
+        },
+    )
+    .unwrap();
+    match preview {
+        CommandOutcome::PurgeSuccess(msg) => {
+            assert!(msg.contains("Would remove"), "{msg}");
+            assert!(
+                msg.contains(&home.join("cache").display().to_string()),
+                "existing cache must be listed: {msg}"
+            );
+            assert!(
+                !msg.contains(&home.join("tmp").display().to_string()),
+                "missing paths must not be listed: {msg}"
+            );
+        }
+        other => panic!("expected PurgeSuccess, got {other:?}"),
+    }
+
+    // Non-interactive purge without --yes/--dry-run refuses.
+    let err = run_purge_with_home(
+        home,
+        &PurgeArgs {
+            dry_run: false,
+            yes: false,
+        },
+    );
+    assert!(err.is_err());
+
+    // With --yes, only the existing paths are really removed.
+    let purge = run_purge_with_home(
+        home,
+        &PurgeArgs {
+            dry_run: false,
+            yes: true,
+        },
+    )
+    .unwrap();
+    match purge {
+        CommandOutcome::PurgeSuccess(msg) => {
+            assert!(msg.contains("removed") && msg.contains("cache"), "{msg}");
+        }
+        other => panic!("expected PurgeSuccess, got {other:?}"),
+    }
+    assert!(!home.join("cache").exists());
+}
+
+#[test]
+fn run_doctor_json_booleans_reflect_tempdir_state() {
+    let temp = tempfile::tempdir().unwrap();
+    let home = temp.path();
+
+    let before = run_doctor_with_home(
+        home,
+        &DoctorArgs {
+            fix: false,
+            json: true,
+        },
+    )
+    .unwrap();
+    match before {
+        CommandOutcome::DoctorReport(report) => {
+            let v: serde_json::Value =
+                serde_json::from_str(&report).expect("doctor --json must be JSON");
+            assert_eq!(
+                v["home_dir"],
+                serde_json::json!(home.display().to_string()),
+                "{report}"
+            );
+            assert_eq!(v["lakehouse"], serde_json::json!(false), "{report}");
+            assert_eq!(v["cache"], serde_json::json!(false), "{report}");
+            assert!(v["model"].is_string() || v["model"].is_null(), "{report}");
+        }
+        other => panic!("expected DoctorReport, got {other:?}"),
+    }
+
+    let after = run_doctor_with_home(
+        home,
+        &DoctorArgs {
+            fix: true,
+            json: true,
+        },
+    )
+    .unwrap();
+    match after {
+        CommandOutcome::DoctorReport(report) => {
+            let v: serde_json::Value = serde_json::from_str(&report).unwrap();
+            assert_eq!(v["lakehouse"], serde_json::json!(true), "{report}");
+            assert_eq!(v["cache"], serde_json::json!(true), "{report}");
+        }
+        other => panic!("expected DoctorReport, got {other:?}"),
+    }
+}
+
+#[test]
+fn run_health_reports_real_wiring_not_pending_universe() {
+    let temp = tempfile::tempdir().unwrap();
+    let out = run_health_with_home(temp.path()).unwrap();
+    match out {
+        CommandOutcome::HealthReport(report) => {
+            assert!(report.contains("scan"), "{report}");
+            assert!(report.contains("serve"), "{report}");
+            assert!(!report.contains("pending universe"), "{report}");
+            assert!(!report.contains("SEBI pre-trade risk ONLINE"), "{report}");
+        }
+        other => panic!("expected HealthReport, got {other:?}"),
     }
 }
