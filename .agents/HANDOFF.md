@@ -1,6 +1,25 @@
 # `tantra-ui` — Inter-Agent Handoff (Layer 5)
 
-> Updated: 2026-11-13 — docs batch: former `docs/roadmap/roadmap.md` dismantled into
+> Updated: 2026-11-15 — **Track T10 complete** (`19b8acd` + `d60d840`):
+> T10.1 real CLI reports (`memory`/`plugin`/`skills`/`mcp`/`doctor`/`purge`/`health`
+> over real `~/.tantra` stores, `memory_store.rs` JSONL journal, hermetic
+> `*_with_home` variants), T10.2 Leptos 0.8 CSR view layer (`tantra-ui-app/src/web.rs`,
+> 8 route views, WASM check green — pre-existing `tantra-ui-core` wasm `std::fs`
+> break fixed), T10.3 TUI real panels (`live_data.rs` `LiveData` + pure
+> `ClientEvent` fold, real Watchlist/Screener/Portfolio/Orders rendering,
+> `TuiApp::publish` seam), T10.4 CLI `scan --server` live `GET /screener/scan`
+> (fixture = offline fallback only), T10.5 plan 0003 (`block_render.rs` ANSI
+> result blocks, `tantra tools search|describe|call` via `tantra-agent-mcp`
+> `McpServer`, `tantra mcp config --client ...`, `ResultBlockWidget` ratatui
+> widget). Gaps 0003–0006 closed; plan 0003 Implemented; `tantra-ui` open gaps
+> 5 → 1 (0007 EE+ charts). Workspace verification green: fmt, clippy `-D
+> warnings`, all crate test suites (cli 79, tui 33, app 59, core 44, api-wasm
+> 37, charts 33, assets 17, highlight 13, client 7), WASM check, `make prod`.
+> Known limitation: `cargo test --workspace` OOMs linking the `tantra-ui`
+> facade's test binary under prod LTO (the facade has no tests; run suites
+> per-crate or `--workspace --exclude tantra-ui`).
+>
+> 2026-11-13 — docs batch: former `docs/roadmap/roadmap.md` dismantled into
 > `docs/design/` (`architecture.md` rewritten source-verified + `implementation-record.md` +
 > per-crate `code-*.md` for all 9 crates + `code-migration-map.md`), `docs/gaps/` gained four
 > source-verified open gaps (0003–0006), `docs/plans/README.md` corrected (plan 0005 SHAs
@@ -81,14 +100,16 @@
   `tantra-runtime/docs/gaps/0004`.
 
 ## 3. Immediate Next Steps
-1. Leptos/CSR view layer for `tantra-ui-app` (feature state models are done; no CSR
-   rendering yet) — open gap 0004.
-2. Wire TUI placeholder tabs (Screener/Portfolio/Orders panels, hardcoded Watchlist rows) to
-   live data — open gap 0005.
-3. Replace the `scan` fixture universe with a live `tantra-runtime-api-rest`
-   `GET /screener/scan` response — open gap 0006.
-4. Wire the canned CLI commands (`memory`/`plugin`/`skills`/`mcp`/`doctor`/`purge`/`health`) —
-   open gap 0003, mostly blocked on `tantra-agent` capabilities.
+1. **EE+ Strategy Studio** (plan 0006, proposed): `tantra-ui-charts` level-line /
+   zone-band / marker / entry-SL-TSL primitives (open gap 0007), then Strategy
+   Studio web/TUI/CLI surfaces — blocked on `tantra-core` 0003 / `tantra-market`
+   0005 / `tantra-data` 0016 (root plan 0005).
+2. **TUI live-feed consumer**: `TuiApp::publish` is wired but nothing drains an
+   `EventStream` into it yet — a tokio feed task (over `tantra-runtime-api-rest`
+   `GET /quotes`/`/portfolio/*`/`/orders` or a market feed) would light up the
+   four real panels without touching the render path.
+3. **Agent Desk UI** (plan 0007, proposed): depends on `tantra-agent` plan 0012
+   (persona roster) + plan 0003 result blocks (now available).
 
 ## 4. Operating Invariants
 - Zero `#[cfg(test)]` / `#[cfg(test)] mod tests` inside `crates/*/src/`.
