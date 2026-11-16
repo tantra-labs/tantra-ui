@@ -1,5 +1,21 @@
 # `tantra-ui` — Inter-Agent Handoff (Layer 5)
 
+> Updated: 2026-11-16 — **T14 P3 IMPLEMENTED (plan 0008, all TDD slices
+> U1–U5)**: `tantra-ui-api-wasm/src/paper.rs` `PaperSession` (thin
+> single-user wrapper over the WASM-portable `tantra-exec-paper` engine;
+> zero-I/O, Decimal, wasm32 check green), `tests/golden/paper_golden.json` U2
+> oracle (4 fills, sell VWAP 100.6667, net 0, cash 1 000 000, 7 events),
+> `AppRoute::Paper` + CSR `PaperView`/`PaperFeature` (embedded `PaperSession`
+> demo + server-mode flag), TUI `/positions` panel on `/ws/live`
+> `ClientEvent`s (`live_data.rs` paper projection; offline fixture fallback),
+> `tantra paper --mode embedded|server` (CLI, deterministic golden tape).
+> Tests: api-wasm +6, app +4 (9 routes), tui +3, cli +4. Workspace gate green
+> (check/test/clippy `-D warnings`/fmt/wasm32/`make prod`). Plan 0008
+> Implemented + index updated; doc retained (root plan 0007 references it).
+> **Next: P4 golden parity** — cross-validate the Python engine against
+> `paper_golden.json` (Rust native ↔ WASM ↔ Python) + root plan 0007 T14.15
+> paper-trading user guide (with `tantra-docs`).
+>
 > Updated: 2026-11-15 — **Track T10 complete** (`19b8acd` + `d60d840`):
 > T10.1 real CLI reports (`memory`/`plugin`/`skills`/`mcp`/`doctor`/`purge`/`health`
 > over real `~/.tantra` stores, `memory_store.rs` JSONL journal, hermetic
@@ -100,15 +116,19 @@
   `tantra-runtime/docs/gaps/0004`.
 
 ## 3. Immediate Next Steps
-1. **EE+ Strategy Studio** (plan 0006, proposed): `tantra-ui-charts` level-line /
+1. **P4 golden parity + docs (root plan 0007 T14.14/T14.15)**: cross-validate
+   the Python engine against `crates/tantra-ui-api-wasm/tests/golden/paper_golden.json`
+   (Rust native ↔ WASM ↔ Python), then the paper-trading user guide
+   (coordinated with `tantra-docs`).
+2. **EE+ Strategy Studio** (plan 0006, proposed): `tantra-ui-charts` level-line /
    zone-band / marker / entry-SL-TSL primitives (open gap 0007), then Strategy
    Studio web/TUI/CLI surfaces — blocked on `tantra-core` 0003 / `tantra-market`
    0005 / `tantra-data` 0016 (root plan 0005).
-2. **TUI live-feed consumer**: `TuiApp::publish` is wired but nothing drains an
+3. **TUI live-feed consumer**: `TuiApp::publish` is wired but nothing drains an
    `EventStream` into it yet — a tokio feed task (over `tantra-runtime-api-rest`
    `GET /quotes`/`/portfolio/*`/`/orders` or a market feed) would light up the
    four real panels without touching the render path.
-3. **Agent Desk UI** (plan 0007, proposed): depends on `tantra-agent` plan 0012
+4. **Agent Desk UI** (plan 0007, proposed): depends on `tantra-agent` plan 0012
    (persona roster) + plan 0003 result blocks (now available).
 
 ## 4. Operating Invariants
