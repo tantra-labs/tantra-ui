@@ -15,8 +15,8 @@ use tantra_agent_mcp::frontier::ManifestGenerator;
 
 use crate::args::{
     ApprovalPolicyArg, AskArgs, ChatArgs, CliArgs, Command, DoctorArgs, JobsArgs, MarketplaceArgs,
-    McpArgs, MemoryArgs, MissedPolicy, OutputFormat, PluginArgs, PurgeArgs, ScanArgs, ServeArgs,
-    SkillsArgs, StrategyArgs, ToolsArgs, VerifyArgs,
+    McpArgs, MemoryArgs, MissedPolicy, OutputFormat, PaperArgs, PaperMode, PluginArgs, PurgeArgs,
+    ScanArgs, ServeArgs, SkillsArgs, StrategyArgs, ToolsArgs, VerifyArgs,
 };
 use crate::jobs_runtime::{AddRequest, JobsRuntime, short_id, summarize_receipt};
 use crate::scan;
@@ -93,6 +93,8 @@ pub enum CommandOutcome {
     StrategySuccess(String),
     /// A `serve` run exited cleanly after graceful shutdown.
     ServeSuccess(String),
+    /// A `paper` session produced a report string (plan 0008 D4).
+    PaperSuccess(String),
 }
 
 /// The CLI home directory (`~/.tantra`, override with `TANTRA_HOME`).
@@ -203,7 +205,23 @@ pub fn run_with_provider(
         Command::Purge(args) => run_purge(args),
         Command::Health => run_health(),
         Command::Strategy(args) => run_strategy(args),
+        Command::Paper(args) => run_paper(args),
     }
+}
+
+/// Run `tantra paper`: embedded deterministic engine session or thin-server
+/// instructions (plan 0008 D4).
+fn run_paper(args: &PaperArgs) -> Result<CommandOutcome, CliError> {
+    let cash = args
+        .cash
+        .as_deref()
+        .and_then(|s| s.trim().parse::<Decimal>().ok())
+        .unwrap_or_else(|| Decimal::new(1_000_000, 0));
+    let msg = match args.mode {
+        PaperMode::Embedded => crate::paper::run_embedded_report(cash, args.seed),
+        PaperMode::Server => crate::paper::run_server_instructions(args.server.as_deref()),
+    };
+    Ok(CommandOutcome::PaperSuccess(msg))
 }
 
 fn run_ask(

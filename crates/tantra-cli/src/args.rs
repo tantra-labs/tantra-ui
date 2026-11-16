@@ -52,6 +52,33 @@ pub enum ApprovalPolicyArg {
     Manual,
 }
 
+/// Session mode for `tantra paper` (plan 0008 D4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum, Default)]
+pub enum PaperMode {
+    /// In-process `PaperExchange` engine (deterministic, offline).
+    #[default]
+    Embedded,
+    /// Thin client of a `tantra paper serve` REST + `/ws/live` server.
+    Server,
+}
+
+/// Arguments for `tantra paper`.
+#[derive(Debug, Clone, PartialEq, Eq, Args)]
+pub struct PaperArgs {
+    /// Session mode: embedded (in-process engine) or server (thin client).
+    #[arg(long, value_enum, default_value = "embedded")]
+    pub mode: PaperMode,
+    /// Initial INR cash for the embedded session (default 1000000).
+    #[arg(long)]
+    pub cash: Option<String>,
+    /// Optional RNG seed for the embedded latency profile (deterministic replay).
+    #[arg(long)]
+    pub seed: Option<u64>,
+    /// Server base URL for `--mode server` instructions.
+    #[arg(long)]
+    pub server: Option<String>,
+}
+
 /// Arguments for `tantra ask`.
 #[derive(Debug, Clone, PartialEq, Eq, Args)]
 pub struct AskArgs {
@@ -397,6 +424,8 @@ pub enum Command {
     Health,
     /// Manage, run, tune, and get trade suggestions for algorithmic strategies.
     Strategy(StrategyArgs),
+    /// Run a deterministic paper trading session (embedded engine or server client).
+    Paper(PaperArgs),
 }
 
 /// The parsed CLI arguments.
@@ -681,6 +710,21 @@ pub enum CliCommand {
     Strategy {
         #[command(subcommand)]
         subcommand: Option<StrategySubcommand>,
+    },
+    /// Run a deterministic paper trading session (embedded engine or server client).
+    Paper {
+        /// Session mode: embedded (in-process engine) or server (thin client).
+        #[arg(long, value_enum, default_value = "embedded")]
+        mode: PaperMode,
+        /// Initial INR cash for the embedded session (default 1000000).
+        #[arg(long)]
+        cash: Option<String>,
+        /// Optional RNG seed for the embedded latency profile (deterministic replay).
+        #[arg(long)]
+        seed: Option<u64>,
+        /// Server base URL for `--mode server` instructions.
+        #[arg(long)]
+        server: Option<String>,
     },
 }
 
@@ -1179,6 +1223,17 @@ impl From<Cli> for CliArgs {
                     risk_pct,
                     format,
                 }),
+            }),
+            Some(CliCommand::Paper {
+                mode,
+                cash,
+                seed,
+                server,
+            }) => Command::Paper(PaperArgs {
+                mode,
+                cash,
+                seed,
+                server,
             }),
         };
 

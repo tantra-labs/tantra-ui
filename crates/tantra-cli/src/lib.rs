@@ -21,21 +21,23 @@ pub mod backtest_gen;
 pub mod block_render;
 pub mod jobs_runtime;
 pub mod memory_store;
+pub mod paper;
 pub mod runner;
 pub mod scan;
 pub mod strategy_bridge;
 
 pub use args::{
     ApprovalPolicyArg, AskArgs, ChatArgs, CliArgs, Command, DoctorArgs, JobsArgs, LogLevel,
-    MarketplaceArgs, McpArgs, MemoryArgs, MissedPolicy, OutputFormat, PluginArgs, PurgeArgs,
-    ScanArgs, SkillsArgs, StrategyArgs, StrategyRunArgs, StrategySubcommand, StrategySuggestArgs,
-    StrategyTuneArgs, VerifyArgs, resolve_log_level,
+    MarketplaceArgs, McpArgs, MemoryArgs, MissedPolicy, OutputFormat, PaperArgs, PaperMode,
+    PluginArgs, PurgeArgs, ScanArgs, SkillsArgs, StrategyArgs, StrategyRunArgs, StrategySubcommand,
+    StrategySuggestArgs, StrategyTuneArgs, VerifyArgs, resolve_log_level,
 };
 pub use backtest_gen::{BacktestQuerySpec, handle_backtest_query, parse_backtest_query};
 pub use jobs_runtime::{
     AddRequest, JobRunRecord, JobsRuntime, RunDisposition, RunReceipt, TickReport, boot_recover,
     mint_run_id, short_id,
 };
+pub use paper::{run_embedded_report, run_server_instructions};
 pub use runner::{
     CliError, CommandOutcome, resolve_provider, run, run_doctor_with_home, run_health_with_home,
     run_jobs_with_home, run_mcp, run_mcp_with_home, run_memory_with_home, run_plugin_with_home,
