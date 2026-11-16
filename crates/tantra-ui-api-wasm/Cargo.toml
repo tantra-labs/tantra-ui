@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "WASM-safe analytics/indicators/margin/pairing/payoff/pricing/replay/screener bindings for the Tantra workstation"
+description = "WASM-safe analytics/indicators/margin/pairing/payoff/pricing/replay/screener/paper bindings for the Tantra workstation"
 
 [lib]
 name = "tantra_ui_api_wasm"
@@ -13,6 +13,26 @@ name = "tantra_ui_api_wasm"
 [dependencies]
 tantra-core.workspace = true
 tantra-ui-core.workspace = true
+# Deterministic single-user paper exchange (plan 0008 D1): the in-browser
+# session wraps this owned, zero-I/O, Decimal-only matching engine. WASM-safe.
+tantra-exec-paper.workspace = true
 rust_decimal = { workspace = true, features = ["maths"] }
+# Explicit `DateTime<Utc>` session transitions (the engine never reads the
+# wall clock); chrono is pure-Rust and wasm32-safe like `tantra-core`.
+chrono.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+rust_decimal_macros.workspace = true
+uuid.workspace = true
+
+# WASM (plan 0008 E8 parity): `wasm32-unknown-unknown` requires the
+# `wasm_js`/`js` RNG backends for the getrandom crates pulled in transitively
+# by `uuid` (v4) and `rand_core`/`ahash` via `tantra-exec-paper`. Feature
+# unification enables them for the whole check graph; no effect on native
+# targets (copied verbatim from `tantra-exec-paper`).
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.4", features = ["wasm_js"] }
+getrandom-02 = { package = "getrandom", version = "0.2", features = ["js"] }

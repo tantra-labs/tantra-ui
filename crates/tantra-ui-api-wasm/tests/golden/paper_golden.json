@@ -1,0 +1,26 @@
+{
+  "name": "paper_golden_tape",
+  "description": "E9 / plan 0008 U2 golden parity vector: two resting buy limits (100@101, 100@100) then a 150-lot market sell on NSE:RELIANCE with a 1,000,000 INR account, ZeroFillCost, no latency. Expected: 4 fills (price-time priority), sell VWAP 100.6667, net position 0, cash back to 1,000,000, 7 events (3 OrderAccepted + 4 fills). Cross-validates Rust native, WASM, and Python engines (P4).",
+  "instrument": "NSE:RELIANCE",
+  "initial_cash": "1000000",
+  "market_price": "100",
+  "timestamp": 1700000000,
+  "orders": [
+    { "index": 1, "side": "Buy", "order_type": "Limit", "quantity": "100", "price": "101", "tif": "Day" },
+    { "index": 2, "side": "Buy", "order_type": "Limit", "quantity": "100", "price": "100", "tif": "Day" },
+    { "index": 3, "side": "Sell", "order_type": "Market", "quantity": "150", "tif": "Day" }
+  ],
+  "expected_fills": [
+    { "price": "101", "quantity": "100", "side": "Sell", "order_index": 3 },
+    { "price": "101", "quantity": "100", "side": "Buy", "order_index": 1 },
+    { "price": "100", "quantity": "50", "side": "Sell", "order_index": 3 },
+    { "price": "100", "quantity": "50", "side": "Buy", "order_index": 2 }
+  ],
+  "expected": {
+    "fill_count": 4,
+    "event_count": 7,
+    "sell_vwap": "100.6667",
+    "net_position": "0",
+    "cash": "1000000"
+  }
+}
