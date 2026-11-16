@@ -116,10 +116,12 @@
   `tantra-runtime/docs/gaps/0004`.
 
 ## 3. Immediate Next Steps
-1. **P4 golden parity + docs (root plan 0007 T14.14/T14.15)**: cross-validate
-   the Python engine against `crates/tantra-ui-api-wasm/tests/golden/paper_golden.json`
-   (Rust native ↔ WASM ↔ Python), then the paper-trading user guide
-   (coordinated with `tantra-docs`).
+1. **P4 golden parity LANDED (root plan 0007 T14.14)**: `tests/golden/paper_golden.json`
+   is now the single canonical vector, byte-identical across the paper engine
+   (`tantra-exec-paper`), this WASM embedding, and the Python wheel
+   (`tantra-ffi` pins the identity in `python/tests/test_paper_golden_identity.py`);
+   `golden_parity_test.rs` reads the canonical schema. Next: the paper-trading
+   user guide (T14.15, coordinated with `tantra-docs`).
 2. **EE+ Strategy Studio** (plan 0006, proposed): `tantra-ui-charts` level-line /
    zone-band / marker / entry-SL-TSL primitives (open gap 0007), then Strategy
    Studio web/TUI/CLI surfaces — blocked on `tantra-core` 0003 / `tantra-market`

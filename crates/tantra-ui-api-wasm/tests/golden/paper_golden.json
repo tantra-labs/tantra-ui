@@ -1,26 +1,30 @@
 {
-  "name": "paper_golden_tape",
-  "description": "E9 / plan 0008 U2 golden parity vector: two resting buy limits (100@101, 100@100) then a 150-lot market sell on NSE:RELIANCE with a 1,000,000 INR account, ZeroFillCost, no latency. Expected: 4 fills (price-time priority), sell VWAP 100.6667, net position 0, cash back to 1,000,000, 7 events (3 OrderAccepted + 4 fills). Cross-validates Rust native, WASM, and Python engines (P4).",
+  "name": "paper-exchange golden tape (tantra-runtime E9, paper_parity_tests.rs)",
+  "description": "Canonical cross-embedding golden vector (root plan 0007 T14.14): byte-identical fills across backtest, paper, Python wheel, and WASM.",
   "instrument": "NSE:RELIANCE",
   "initial_cash": "1000000",
   "market_price": "100",
-  "timestamp": 1700000000,
+  "ts0": "2023-11-14T22:13:20Z",
   "orders": [
-    { "index": 1, "side": "Buy", "order_type": "Limit", "quantity": "100", "price": "101", "tif": "Day" },
-    { "index": 2, "side": "Buy", "order_type": "Limit", "quantity": "100", "price": "100", "tif": "Day" },
-    { "index": 3, "side": "Sell", "order_type": "Market", "quantity": "150", "tif": "Day" }
-  ],
-  "expected_fills": [
-    { "price": "101", "quantity": "100", "side": "Sell", "order_index": 3 },
-    { "price": "101", "quantity": "100", "side": "Buy", "order_index": 1 },
-    { "price": "100", "quantity": "50", "side": "Sell", "order_index": 3 },
-    { "price": "100", "quantity": "50", "side": "Buy", "order_index": 2 }
+    { "id": 1, "side": "BUY",  "order_type": "LIMIT",  "quantity": "100", "limit_price": "101" },
+    { "id": 2, "side": "BUY",  "order_type": "LIMIT",  "quantity": "100", "limit_price": "100" },
+    { "id": 3, "side": "SELL", "order_type": "MARKET", "quantity": "150" }
   ],
   "expected": {
-    "fill_count": 4,
-    "event_count": 7,
-    "sell_vwap": "100.6667",
-    "net_position": "0",
-    "cash": "1000000"
+    "fills": [
+      { "side": "SELL", "price": "101", "quantity": "100" },
+      { "side": "BUY",  "price": "101", "quantity": "100" },
+      { "side": "SELL", "price": "100", "quantity": "50" },
+      { "side": "BUY",  "price": "100", "quantity": "50" }
+    ],
+    "order_states": {
+      "buy101": "FILLED",
+      "buy100": "PARTIALLY_FILLED",
+      "sell": "FILLED"
+    },
+    "sell_filled_qty": "150",
+    "sell_avg_fill_price": "100.6667",
+    "net_cash": "1000000",
+    "event_count": 7
   }
 }
