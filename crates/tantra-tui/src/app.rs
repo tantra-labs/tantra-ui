@@ -710,10 +710,8 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
                 ));
             }
             "/positions" => {
-                self.chat.push(AgentMessage::new(
-                    AgentRole::System,
-                    "Paper Trading Positions:\n  • NIFTY 24500 CE  (100 qty)  LTP: ₹142.50  PnL: +₹3,200 (+2.3%)\n  • RELIANCE        (50 qty)   LTP: ₹2,980.10 PnL: -₹450 (-0.3%)\n  Total MTM: +₹2,750 (Pre-trade margin validated, SEBI risk limits OK)\n  Modal keys: Enter opens positions or order log.",
-                ));
+                let panel = crate::live_data::paper_panel_text(&self.live);
+                self.chat.push(AgentMessage::new(AgentRole::System, panel));
             }
             "/artifacts" => {
                 self.chat.push(AgentMessage::new(
