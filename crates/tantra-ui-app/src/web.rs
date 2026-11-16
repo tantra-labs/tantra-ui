@@ -25,6 +25,10 @@ use tantra_ui_core::backtest::BacktestSummary;
 
 use crate::algos::AlgosFeature;
 use crate::backtest::BacktestFeature;
+use crate::paper::{
+    PaperFeature, paper_depth, paper_fills, paper_order_ticket, paper_positions_equity,
+    paper_working_orders,
+};
 use crate::portfolio::PortfolioFeature;
 use crate::router::{AppRoute, Router};
 use crate::screener::ScreenerFeature;
@@ -83,6 +87,7 @@ pub fn App() -> impl IntoView {
                     AppRoute::Backtest => view! { <BacktestView/> }.into_any(),
                     AppRoute::Portfolio => view! { <PortfolioView/> }.into_any(),
                     AppRoute::Algos => view! { <AlgosView/> }.into_any(),
+                    AppRoute::Paper => view! { <PaperView/> }.into_any(),
                 }}
             </main>
         </div>
@@ -301,6 +306,74 @@ fn AlgosView() -> impl IntoView {
                     .map(|v| v.into_any())
                     .collect::<Vec<_>>()
             }}
+        </section>
+    }
+}
+
+/// Paper trading panel: order ticket + working orders / fills / depth /
+/// positions over the in-browser `PaperSession` (embedded mode) or a
+/// `/ws/live` server (plan 0008 D2). "Run demo tape" drives the real engine
+/// deterministically.
+#[component]
+fn PaperView() -> impl IntoView {
+    let feature = RwSignal::new(PaperFeature::new());
+
+    view! {
+        <section class="tantra-panel">
+            <h1>{route_title(AppRoute::Paper)}</h1>
+            <button on:click=move |_| { feature.update(|f| f.run_embedded_demo()); }>
+                "Run demo tape"
+            </button>
+            <h2>"Order ticket"</h2>
+            <ul>
+                {move || {
+                    paper_order_ticket(&feature.get())
+                        .into_iter()
+                        .map(|(k, v)| view! { <li><strong>{k}</strong>": " {v}</li> })
+                        .map(|v| v.into_any())
+                        .collect::<Vec<_>>()
+                }}
+            </ul>
+            <h2>"Working orders"</h2>
+            <ul>
+                {move || {
+                    paper_working_orders(&feature.get())
+                        .into_iter()
+                        .map(|text| view! { <li>{text}</li> })
+                        .map(|v| v.into_any())
+                        .collect::<Vec<_>>()
+                }}
+            </ul>
+            <h2>"Fills"</h2>
+            <ul>
+                {move || {
+                    paper_fills(&feature.get())
+                        .into_iter()
+                        .map(|text| view! { <li>{text}</li> })
+                        .map(|v| v.into_any())
+                        .collect::<Vec<_>>()
+                }}
+            </ul>
+            <h2>"Depth"</h2>
+            <ul>
+                {move || {
+                    paper_depth(&feature.get())
+                        .into_iter()
+                        .map(|text| view! { <li>{text}</li> })
+                        .map(|v| v.into_any())
+                        .collect::<Vec<_>>()
+                }}
+            </ul>
+            <h2>"Positions / equity"</h2>
+            <ul>
+                {move || {
+                    paper_positions_equity(&feature.get())
+                        .into_iter()
+                        .map(|text| view! { <li>{text}</li> })
+                        .map(|v| v.into_any())
+                        .collect::<Vec<_>>()
+                }}
+            </ul>
         </section>
     }
 }

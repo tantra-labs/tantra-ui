@@ -6,7 +6,7 @@
 //! the wasm32-unknown-unknown invariant minimal. Instead they assert on:
 //!   * the pure `view_model` helpers (`route_title`, `watchlist_lines`,
 //!     `portfolio_lines`, `screener_predicate_text`, ...),
-//!   * the router wiring and full 8-view coverage of [`AppRoute::ALL`],
+//!   * the router wiring and full 9-view coverage of [`AppRoute::ALL`],
 //!   * compile-level coverage — the host `cargo check -p tantra-ui-app`
 //!     proves the `view!` components in `src/web.rs` themselves compile.
 
@@ -43,10 +43,10 @@ fn route_title_maps_every_route() {
     }
 }
 
-/// `AppRoute::ALL` covers exactly the eight views, all distinct.
+/// `AppRoute::ALL` covers exactly the nine views, all distinct.
 #[test]
-fn all_routes_are_distinct_and_cover_eight_views() {
-    assert_eq!(AppRoute::ALL.len(), 8);
+fn all_routes_are_distinct_and_cover_nine_views() {
+    assert_eq!(AppRoute::ALL.len(), 9);
     let mut seen = Vec::new();
     for route in AppRoute::ALL {
         assert!(!seen.contains(&route), "duplicate route in ALL: {route:?}");
@@ -75,7 +75,7 @@ fn router_drives_all_views() {
 
     // Back returns to the route active before the last navigation.
     router.back();
-    assert_eq!(router.active, AppRoute::Portfolio);
+    assert_eq!(router.active, AppRoute::Algos);
 }
 
 /// Screener comparison operators render as symbols.

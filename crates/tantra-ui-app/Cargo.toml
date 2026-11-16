@@ -32,6 +32,9 @@ getrandom = { workspace = true }
 # threads, no blocking I/O. The view layer renders the eight `AppRoute` views
 # from the in-memory feature-state models.
 leptos = { version = "0.8", default-features = false, features = ["csr"] }
+# Explicit `DateTime<Utc>` for the embedded paper demo tape (plan 0008 D2);
+# pure-Rust and wasm32-safe like `tantra-core`.
+chrono.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

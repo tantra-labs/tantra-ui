@@ -52,7 +52,9 @@ fn route_labels_and_paths() {
     assert_eq!(AppRoute::Backtest.path(), "/backtest");
     assert_eq!(AppRoute::Portfolio.path(), "/portfolio");
     assert_eq!(AppRoute::Algos.path(), "/algos");
-    assert_eq!(AppRoute::ALL.len(), 8);
+    assert_eq!(AppRoute::Paper.label(), "Paper");
+    assert_eq!(AppRoute::Paper.path(), "/paper");
+    assert_eq!(AppRoute::ALL.len(), 9);
 }
 
 #[test]

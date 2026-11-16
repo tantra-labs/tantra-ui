@@ -16,6 +16,7 @@
 
 pub mod algos;
 pub mod backtest;
+pub mod paper;
 pub mod portfolio;
 pub mod router;
 pub mod screener;
@@ -27,6 +28,7 @@ pub mod web;
 
 pub use algos::AlgosFeature;
 pub use backtest::BacktestFeature;
+pub use paper::{PaperFeature, PaperMode, PaperOrderKind, PaperSide};
 pub use portfolio::PortfolioFeature;
 pub use router::{AppRoute, Router, RouterError};
 pub use screener::{ScreenerFeature, ScreenerFeatureError};

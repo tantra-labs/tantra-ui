@@ -22,6 +22,8 @@ pub enum AppRoute {
     Portfolio,
     /// Algo / strategy management.
     Algos,
+    /// Paper trading panel (embedded in-browser engine or `/ws/live` server).
+    Paper,
 }
 
 impl AppRoute {
@@ -36,6 +38,7 @@ impl AppRoute {
             Self::Backtest => "Backtest",
             Self::Portfolio => "Portfolio",
             Self::Algos => "Algos",
+            Self::Paper => "Paper",
         }
     }
 
@@ -50,11 +53,12 @@ impl AppRoute {
             Self::Backtest => "/backtest",
             Self::Portfolio => "/portfolio",
             Self::Algos => "/algos",
+            Self::Paper => "/paper",
         }
     }
 
     /// All routes in display order.
-    pub const ALL: [AppRoute; 8] = [
+    pub const ALL: [AppRoute; 9] = [
         AppRoute::Home,
         AppRoute::Screener,
         AppRoute::Studio,
@@ -63,6 +67,7 @@ impl AppRoute {
         AppRoute::Backtest,
         AppRoute::Portfolio,
         AppRoute::Algos,
+        AppRoute::Paper,
     ];
 }
 
