@@ -7,12 +7,13 @@ Every gap filed in this repo, newest last. See
 
 | # | Title | Area |
 | :--- | :--- | :--- |
-| [0007](0007-chart-level-and-annotation-primitives.md) | Charts lack level-line / zone-band / marker / entry-SL-TSL line primitives (EE+ Strategy Studio) | `tantra-ui-charts` |
+| _(none)_ | — | — |
 
 ## Closed
 
 | # | Title | Area | Resolution |
 | :--- | :--- | :--- | :--- |
+| 0007 | Charts lack level-line / zone-band / marker / entry-SL-TSL line primitives (EE+ Strategy Studio) | `tantra-ui-charts` | Closed 2026-11-17 (T12.9, `f597915`): `LevelLine` (`price_to_row` mapping), `ZoneBand` (`overlaps`/`y_rows`), `SignalMarker` (`anchor`, `MarkerSide`/`MarkerKind`), `StopLine` (`update` re-render path + `previous_price`) geometry primitives in `crates/tantra-ui-charts`; `GeometryError::InvalidGeometry`; wasm32 green. Tests `levels_test`/`zones_test`/`markers_test`/`stops_test` (28). Follow-on (ui plan 0006): the Strategy Studio view layer consuming these primitives. |
 | 0001 | CLI `scan` was `NotWired`; wired to canonical screener | `tantra-cli` runner | Implemented via `crates/tantra-cli/src/scan.rs` + `runner.rs` (`CommandOutcome::ScanResults`); tests in `crates/tantra-cli/tests/unit_tests.rs`. Gap doc removed (implemented). |
 | 0002 | Job `trades.json` wrote aggregates only; no per-trade rows | `tantra-ui-core` strategy | `BacktestReport.trades: Vec<TradeRow>` + `simulate_strategy` row emission; `jobs_runtime.rs` journals the row list; tests in `crates/tantra-ui-core/tests/strategy_primitives_test.rs`. Gap doc removed (implemented). |
 | 0003 | CLI `memory`/`plugin`/`skills`/`mcp`/`doctor`/`purge`/`health` commands return canned string reports | `tantra-cli` runner | Implemented via real on-disk stores (`memory_store.rs` JSONL journal, `~/.tantra/{memory,plugins,skills,mcp}` dirs), real doctor env checks, purge real-path listing, factual health report (no stale "scan pending universe"); hermetic `*_with_home` variants. Tests in `tests/unit_tests.rs`. Gap doc removed (implemented, `19b8acd`). |
