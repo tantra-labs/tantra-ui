@@ -62,6 +62,8 @@ pub enum GeometryError {
     ZeroViewport,
     /// The price range has zero span (flat series) — cannot map prices.
     FlatPriceRange,
+    /// Invalid geometry parameters (inverted coordinates, non-positive price).
+    InvalidGeometry,
 }
 
 impl core::fmt::Display for GeometryError {
@@ -70,6 +72,7 @@ impl core::fmt::Display for GeometryError {
             Self::EmptySeries => write!(f, "chart series is empty"),
             Self::ZeroViewport => write!(f, "chart viewport has zero size"),
             Self::FlatPriceRange => write!(f, "chart price range is flat"),
+            Self::InvalidGeometry => write!(f, "invalid chart geometry parameters"),
         }
     }
 }

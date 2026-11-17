@@ -14,3 +14,10 @@ name = "tantra_ui_charts"
 tantra-core.workspace = true
 rust_decimal.workspace = true
 serde.workspace = true
+schemars.workspace = true
+# Enables getrandom's `wasm_js` backend for wasm32-unknown-unknown (WASM
+# contract, migration-guide.md §2 — mirrors tantra-ui-app/tantra-ui-api-wasm).
+getrandom.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

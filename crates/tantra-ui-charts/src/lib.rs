@@ -16,10 +16,18 @@
 
 pub mod axis;
 pub mod candle;
+pub mod levels;
+pub mod markers;
 pub mod series;
+pub mod stops;
 pub mod theme;
+pub mod zones;
 
 pub use axis::{AxisTicks, ChartRange, tick_positions};
 pub use candle::{Candle, CandlestickChart, GeometryError};
+pub use levels::{LevelLine, LevelLineStyle};
+pub use markers::{MarkerKind, MarkerSide, SignalMarker};
 pub use series::{ChartPoint, ChartSeries, LineChart};
+pub use stops::{StopKind, StopLine};
 pub use theme::ChartPalette;
+pub use zones::ZoneBand;
