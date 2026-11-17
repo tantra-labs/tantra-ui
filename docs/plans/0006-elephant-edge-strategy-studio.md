@@ -78,6 +78,6 @@ Rust REST API already emit (`tantra-core` plan 0003).
 
 ## 5. Related
 
-- Chart gap: [`docs/gaps/0007-chart-level-and-annotation-primitives.md`](../gaps/0007-chart-level-and-annotation-primitives.md)
-- Strategy spec: [`tantra-strategies/docs/plans/0001-elephant-edge-strategy.md`](../../../tantra-strategies/docs/plans/0001-elephant-edge-strategy.md)
+- Chart gap 0007 (see [`docs/gaps/README.md`](../gaps/README.md)) — **closed 2026-11-17 (T12.9)**: `LevelLine`/`ZoneBand`/`SignalMarker`/`StopLine` shipped in `tantra-ui-charts`; this Studio view layer consumes them
+- Strategy spec: [`tantra-strategies` plan 0001](../../../tantra-strategies/docs/plans/README.md) (EE+ strategy — **implemented 2026-11-17, T12.4**)
 - Research (level-map legend & OI/gamma layers): [`docs/research/elephant-edge-strategy.md`](../../../docs/research/elephant-edge-strategy.md)
