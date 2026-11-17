@@ -28,7 +28,7 @@ fn row(symbol: &str, pe: &str, roe: &str) -> ScreenerRow {
 fn new_feature_starts_empty() {
     let f = ScreenerFeature::new();
     assert!(!f.scanning);
-    assert!(f.request.filters.predicates.is_empty());
+    assert!(f.request.filters.items.is_empty());
     assert_eq!(f.request.limit, Some(50));
 }
 
@@ -37,8 +37,9 @@ fn add_filter_appends_predicate() {
     let mut f = ScreenerFeature::new();
     f.add_filter("pe", FilterOp::Between, dec("10"), Some(dec("30")))
         .unwrap();
-    assert_eq!(f.request.filters.predicates.len(), 1);
-    assert_eq!(f.request.filters.predicates[0].metric.0.metric, "pe");
+    let preds = f.request.filters.predicates();
+    assert_eq!(preds.len(), 1);
+    assert_eq!(preds[0].metric.0.key, "pe");
 }
 
 #[test]
@@ -55,7 +56,7 @@ fn clear_filters_empties_query_and_chips() {
     let mut f = ScreenerFeature::new();
     f.add_filter("pe", FilterOp::Gt, dec("10"), None).unwrap();
     f.clear_filters();
-    assert!(f.request.filters.predicates.is_empty());
+    assert!(f.request.filters.items.is_empty());
     assert!(f.view.filters.is_empty());
 }
 

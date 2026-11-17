@@ -17,7 +17,7 @@ use tantra_cli::runner::{
     run_skills_with_home, run_with_provider,
 };
 use tantra_cli::scan::{parse_query, scan_universe};
-use tantra_core::screener::{FilterOp, ScreenerScanRequest};
+use tantra_core::screener::{FilterOp, LogicalOp, PredicateValue, ScreenerScanRequest};
 
 #[test]
 fn parse_cli_roundtrip_tui() {
@@ -334,31 +334,39 @@ fn run_scan_rejects_empty_query() {
 #[test]
 fn scan_parse_single_predicate() {
     let req: ScreenerScanRequest = parse_query("pe<25").unwrap();
-    assert_eq!(req.filters.predicates.len(), 1);
-    let p = &req.filters.predicates[0];
-    assert_eq!(p.metric.0.metric, "pe");
+    let preds = req.filters.predicates();
+    assert_eq!(preds.len(), 1);
+    let p = preds[0];
+    assert_eq!(p.metric.0.key, "pe");
     assert!(matches!(p.op, FilterOp::Lt));
-    assert_eq!(p.value, Decimal::from(25));
-    assert_eq!(p.value_upper, None);
+    assert_eq!(p.value, PredicateValue::Decimal(Decimal::from(25)));
+    assert_eq!(p.between_bounds(), None);
 }
 
 #[test]
 fn scan_parse_between() {
     let req: ScreenerScanRequest = parse_query("pe between 10 30").unwrap();
-    let p = &req.filters.predicates[0];
-    assert_eq!(p.metric.0.metric, "pe");
+    let preds = req.filters.predicates();
+    let p = preds[0];
+    assert_eq!(p.metric.0.key, "pe");
     assert!(matches!(p.op, FilterOp::Between));
-    assert_eq!(p.value, Decimal::from(10));
-    assert_eq!(p.value_upper, Some(Decimal::from(30)));
+    assert_eq!(
+        p.between_bounds(),
+        Some((
+            &PredicateValue::Decimal(Decimal::from(10)),
+            &PredicateValue::Decimal(Decimal::from(30))
+        ))
+    );
 }
 
 #[test]
 fn scan_parse_compound_and() {
     let req: ScreenerScanRequest = parse_query("roe>15 and pe<30").unwrap();
-    assert_eq!(req.filters.predicates.len(), 2);
-    assert!(req.filters.match_all);
-    assert!(matches!(req.filters.predicates[0].op, FilterOp::Gt));
-    assert!(matches!(req.filters.predicates[1].op, FilterOp::Lt));
+    let preds = req.filters.predicates();
+    assert_eq!(preds.len(), 2);
+    assert_eq!(req.filters.operator, LogicalOp::And);
+    assert!(matches!(preds[0].op, FilterOp::Gt));
+    assert!(matches!(preds[1].op, FilterOp::Lt));
 }
 
 #[test]

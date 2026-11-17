@@ -14,10 +14,7 @@ fn dec(s: &str) -> Decimal {
 }
 
 fn metric(name: &str) -> MetricRef {
-    MetricRef(MetricKeySpec {
-        metric: name.to_string(),
-        period: MetricPeriod::D1,
-    })
+    MetricRef(MetricKeySpec::new(name).with_period(MetricPeriod::D1))
 }
 
 fn instrument(symbol: &str) -> InstrumentId {

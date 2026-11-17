@@ -2,8 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 use tantra_core::screener::{
-    FilterOp, MetricKeySpec, MetricPeriod, MetricRef, ScreenerFilterGroup, ScreenerFilterPredicate,
-    ScreenerScanRequest, ScreenerScanResponse,
+    FilterOp, MetricKeySpec, MetricPeriod, MetricRef, PredicateValue, ScreenerFilterGroup,
+    ScreenerFilterItem, ScreenerFilterPredicate, ScreenerScanRequest, ScreenerScanResponse,
 };
 use tantra_ui_api_wasm::screener::apply_scan;
 use tantra_ui_core::screener::{
@@ -34,10 +34,7 @@ impl ScreenerFeature {
         Self {
             request: ScreenerScanRequest {
                 universe: None,
-                filters: ScreenerFilterGroup {
-                    predicates: Vec::new(),
-                    match_all: true,
-                },
+                filters: ScreenerFilterGroup::empty(),
                 sort: None,
                 limit: Some(50),
             },
@@ -61,24 +58,27 @@ impl ScreenerFeature {
         if name.trim().is_empty() {
             return Err(ScreenerFeatureError::InvalidMetric);
         }
+        let metric_ref = MetricRef(MetricKeySpec::new(name).with_period(MetricPeriod::D1));
+        let predicate = if op == FilterOp::Between {
+            let upper = value_upper.unwrap_or(value);
+            ScreenerFilterPredicate::between(
+                metric_ref,
+                PredicateValue::Decimal(value),
+                PredicateValue::Decimal(upper),
+            )
+        } else {
+            ScreenerFilterPredicate::new(metric_ref, op, PredicateValue::Decimal(value))
+        };
         self.request
             .filters
-            .predicates
-            .push(ScreenerFilterPredicate {
-                metric: MetricRef(MetricKeySpec {
-                    metric: name,
-                    period: MetricPeriod::D1,
-                }),
-                op,
-                value,
-                value_upper,
-            });
+            .items
+            .push(ScreenerFilterItem::Predicate(predicate));
         Ok(())
     }
 
     /// Clear all filter predicates.
     pub fn clear_filters(&mut self) {
-        self.request.filters.predicates.clear();
+        self.request.filters.items.clear();
         self.view.filters.clear();
     }
 
@@ -110,13 +110,21 @@ impl ScreenerFeature {
         self.view.filters = self
             .request
             .filters
-            .predicates
-            .iter()
-            .map(|p| ScreenerFilterChip {
-                metric: p.metric.0.metric.clone(),
-                op: p.op,
-                value: p.value,
-                value_upper: p.value_upper,
+            .predicates()
+            .into_iter()
+            .filter_map(|p| {
+                if let Some((lo, hi)) = p.between_bounds() {
+                    let lo_dec = lo.as_decimal()?;
+                    let hi_dec = hi.as_decimal()?;
+                    Some(
+                        ScreenerFilterChip::new(p.metric.0.key.clone(), p.op, lo_dec)
+                            .with_upper(hi_dec),
+                    )
+                } else {
+                    p.value
+                        .as_decimal()
+                        .map(|d| ScreenerFilterChip::new(p.metric.0.key.clone(), p.op, d))
+                }
             })
             .collect();
         self.view.sort = self.request.sort.as_ref().map(|s| ScreenerSort {
@@ -131,8 +139,8 @@ impl ScreenerFeature {
 
     fn default_columns(request: &ScreenerScanRequest) -> Vec<ScreenerColumn> {
         let mut columns = vec![ScreenerColumn::new("instrument", "Instrument")];
-        for pred in &request.filters.predicates {
-            let key = pred.metric.0.metric.clone();
+        for pred in request.filters.predicates() {
+            let key = pred.metric.0.key.clone();
             columns.push(ScreenerColumn::new(key.clone(), key).right_aligned());
         }
         columns

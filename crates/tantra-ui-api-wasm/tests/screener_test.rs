@@ -1,10 +1,11 @@
 //! Tests for screener-scan bindings.
 
-use rust_decimal::Decimal;
 use std::collections::BTreeMap;
+
+use rust_decimal::Decimal;
 use tantra_core::screener::{
-    FilterOp, MetricKeySpec, MetricPeriod, MetricRef, ScreenerFilterGroup, ScreenerFilterPredicate,
-    ScreenerRow, ScreenerScanRequest, SortSpec,
+    FilterOp, MetricKeySpec, MetricPeriod, MetricRef, PredicateValue, ScreenerFilterGroup,
+    ScreenerFilterItem, ScreenerFilterPredicate, ScreenerRow, ScreenerScanRequest, SortSpec,
 };
 use tantra_core::types::{Exchange, InstrumentId};
 use tantra_ui_api_wasm::screener::{apply_scan, filter_group_matches, row};
@@ -18,10 +19,7 @@ fn inst(symbol: &str) -> InstrumentId {
 }
 
 fn metric(name: &str) -> MetricRef {
-    MetricRef(MetricKeySpec {
-        metric: name.to_string(),
-        period: MetricPeriod::D1,
-    })
+    MetricRef(MetricKeySpec::new(name).with_period(MetricPeriod::D1))
 }
 
 fn row_with(symbol: &str, metrics: &[(&str, &str)]) -> ScreenerRow {
@@ -45,23 +43,18 @@ fn filter_gt_plus_between() {
     let u = universe();
     let request = ScreenerScanRequest {
         universe: None,
-        filters: ScreenerFilterGroup {
-            predicates: vec![
-                ScreenerFilterPredicate {
-                    metric: metric("roe"),
-                    op: FilterOp::Gt,
-                    value: dec("15"),
-                    value_upper: None,
-                },
-                ScreenerFilterPredicate {
-                    metric: metric("pe"),
-                    op: FilterOp::Between,
-                    value: dec("10"),
-                    value_upper: Some(dec("30")),
-                },
-            ],
-            match_all: true,
-        },
+        filters: ScreenerFilterGroup::and(vec![
+            ScreenerFilterItem::Predicate(ScreenerFilterPredicate::new(
+                metric("roe"),
+                FilterOp::Gt,
+                PredicateValue::Decimal(dec("15")),
+            )),
+            ScreenerFilterItem::Predicate(ScreenerFilterPredicate::between(
+                metric("pe"),
+                PredicateValue::Decimal(dec("10")),
+                PredicateValue::Decimal(dec("30")),
+            )),
+        ]),
         sort: None,
         limit: None,
     };
@@ -84,23 +77,18 @@ fn match_any_group() {
     let u = universe();
     let request = ScreenerScanRequest {
         universe: None,
-        filters: ScreenerFilterGroup {
-            predicates: vec![
-                ScreenerFilterPredicate {
-                    metric: metric("pe"),
-                    op: FilterOp::Lt,
-                    value: dec("10"),
-                    value_upper: None,
-                },
-                ScreenerFilterPredicate {
-                    metric: metric("roe"),
-                    op: FilterOp::Gt,
-                    value: dec("21"),
-                    value_upper: None,
-                },
-            ],
-            match_all: false,
-        },
+        filters: ScreenerFilterGroup::or(vec![
+            ScreenerFilterItem::Predicate(ScreenerFilterPredicate::new(
+                metric("pe"),
+                FilterOp::Lt,
+                PredicateValue::Decimal(dec("10")),
+            )),
+            ScreenerFilterItem::Predicate(ScreenerFilterPredicate::new(
+                metric("roe"),
+                FilterOp::Gt,
+                PredicateValue::Decimal(dec("21")),
+            )),
+        ]),
         sort: None,
         limit: None,
     };
@@ -114,10 +102,7 @@ fn sort_desc_and_limit() {
     let u = universe();
     let request = ScreenerScanRequest {
         universe: None,
-        filters: ScreenerFilterGroup {
-            predicates: Vec::new(),
-            match_all: true,
-        },
+        filters: ScreenerFilterGroup::empty(),
         sort: Some(SortSpec {
             metric: metric("pe"),
             descending: true,
@@ -137,14 +122,12 @@ fn sort_desc_and_limit() {
 fn missing_metric_row_fails_filter() {
     let mut u = universe();
     u.push(row_with("HDFCBANK", &[("pe", "20")])); // no roe metric
-    let group = ScreenerFilterGroup {
-        predicates: vec![ScreenerFilterPredicate {
-            metric: metric("roe"),
-            op: FilterOp::Gt,
-            value: dec("0"),
-            value_upper: None,
-        }],
-        match_all: true,
-    };
+    let group = ScreenerFilterGroup::and(vec![ScreenerFilterItem::Predicate(
+        ScreenerFilterPredicate::new(
+            metric("roe"),
+            FilterOp::Gt,
+            PredicateValue::Decimal(dec("0")),
+        ),
+    )]);
     assert!(!filter_group_matches(&group, u.last().unwrap()));
 }

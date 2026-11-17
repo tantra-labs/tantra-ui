@@ -13,8 +13,8 @@ use tantra_core::portfolio::{
     PortfolioTotals,
 };
 use tantra_core::screener::{
-    FilterOp, MetricKeySpec, MetricPeriod, MetricRef, ScreenerFilterGroup, ScreenerFilterPredicate,
-    ScreenerScanRequest,
+    FilterOp, MetricKeySpec, MetricPeriod, MetricRef, PredicateValue, ScreenerFilterGroup,
+    ScreenerFilterItem, ScreenerFilterPredicate, ScreenerScanRequest,
 };
 use tantra_core::types::{Currency, Exchange, InstrumentId, Money, Price, Quantity};
 use tantra_ui_core::screener::ScreenerFilterChip;
@@ -154,33 +154,22 @@ pub fn portfolio_snapshot() -> PortfolioSnapshot {
 
 /// A deterministic screener scan request: ROE > 15, PE between 10 and 30.
 pub fn screener_request() -> ScreenerScanRequest {
-    let roe = MetricRef(MetricKeySpec {
-        metric: "roe".to_string(),
-        period: MetricPeriod::D1,
-    });
-    let pe = MetricRef(MetricKeySpec {
-        metric: "pe".to_string(),
-        period: MetricPeriod::D1,
-    });
+    let roe = MetricRef(MetricKeySpec::new("roe").with_period(MetricPeriod::D1));
+    let pe = MetricRef(MetricKeySpec::new("pe").with_period(MetricPeriod::D1));
     ScreenerScanRequest {
         universe: Some(vec![reliance(), tcs()]),
-        filters: ScreenerFilterGroup {
-            predicates: vec![
-                ScreenerFilterPredicate {
-                    metric: roe,
-                    op: FilterOp::Gt,
-                    value: dec("15"),
-                    value_upper: None,
-                },
-                ScreenerFilterPredicate {
-                    metric: pe,
-                    op: FilterOp::Between,
-                    value: dec("10"),
-                    value_upper: Some(dec("30")),
-                },
-            ],
-            match_all: true,
-        },
+        filters: ScreenerFilterGroup::and(vec![
+            ScreenerFilterItem::Predicate(ScreenerFilterPredicate::new(
+                roe,
+                FilterOp::Gt,
+                PredicateValue::Decimal(dec("15")),
+            )),
+            ScreenerFilterItem::Predicate(ScreenerFilterPredicate::between(
+                pe,
+                PredicateValue::Decimal(dec("10")),
+                PredicateValue::Decimal(dec("30")),
+            )),
+        ]),
         sort: None,
         limit: Some(25),
     }

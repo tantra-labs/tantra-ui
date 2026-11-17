@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use rust_decimal::Decimal;
 use tantra_core::screener::{
-    FilterOp, ScreenerFilterGroup, ScreenerFilterPredicate, ScreenerRow, ScreenerScanRequest,
-    ScreenerScanResponse,
+    FilterOp, LogicalOp, PredicateValue, ScreenerFilterGroup, ScreenerFilterItem,
+    ScreenerFilterPredicate, ScreenerRow, ScreenerScanRequest, ScreenerScanResponse,
 };
 
 /// Errors produced while scanning rows.
@@ -32,7 +32,7 @@ pub fn apply_scan(
 
     let mut rows = matches;
     if let Some(sort) = &request.sort {
-        let key = sort.metric.0.metric.clone();
+        let key = sort.metric.0.key.clone();
         rows.sort_by(|a, b| {
             let av = a.metrics.get(&key).copied().unwrap_or_default();
             let bv = b.metrics.get(&key).copied().unwrap_or_default();
@@ -52,30 +52,101 @@ pub fn apply_scan(
     })
 }
 
-/// Whether every predicate in a group matches a row.
+/// Whether a recursive filter group matches a row.
 pub fn filter_group_matches(group: &ScreenerFilterGroup, row: &ScreenerRow) -> bool {
-    if group.match_all {
-        group.predicates.iter().all(|p| predicate_matches(p, row))
-    } else {
-        group.predicates.iter().any(|p| predicate_matches(p, row))
+    if let Some(c) = &group.classification
+        && !c.is_empty()
+    {
+        return false;
+    }
+    match group.operator {
+        LogicalOp::And => group.items.iter().all(|item| item_matches(item, row)),
+        LogicalOp::Or => {
+            if group.items.is_empty() {
+                true
+            } else {
+                group.items.iter().any(|item| item_matches(item, row))
+            }
+        }
+    }
+}
+
+fn item_matches(item: &ScreenerFilterItem, row: &ScreenerRow) -> bool {
+    match item {
+        ScreenerFilterItem::Predicate(pred) => predicate_matches(pred, row),
+        ScreenerFilterItem::Group(nested) => filter_group_matches(nested, row),
+    }
+}
+
+fn operand_decimal(operand: &PredicateValue, row: &ScreenerRow) -> Option<Decimal> {
+    match operand {
+        PredicateValue::Decimal(d) => Some(*d),
+        PredicateValue::MetricRef(m) => row.metrics.get(&m.0.key).copied(),
+        _ => None,
     }
 }
 
 fn predicate_matches(pred: &ScreenerFilterPredicate, row: &ScreenerRow) -> bool {
-    let Some(value) = row.metrics.get(&pred.metric.0.metric) else {
+    if pred.relative_to.is_some() || pred.relative_stat.is_some() {
+        return false;
+    }
+    let Some(value) = row.metrics.get(&pred.metric.0.key) else {
         return false;
     };
     match pred.op {
-        FilterOp::Eq => *value == pred.value,
-        FilterOp::Ne => *value != pred.value,
-        FilterOp::Gt => *value > pred.value,
-        FilterOp::Gte => *value >= pred.value,
-        FilterOp::Lt => *value < pred.value,
-        FilterOp::Lte => *value <= pred.value,
-        FilterOp::Between => {
-            let upper = pred.value_upper.unwrap_or(pred.value);
-            *value >= pred.value && *value <= upper
+        FilterOp::Eq
+        | FilterOp::Ne
+        | FilterOp::Gt
+        | FilterOp::Gte
+        | FilterOp::Lt
+        | FilterOp::Lte => {
+            let Some(target) = operand_decimal(&pred.value, row) else {
+                return false;
+            };
+            match pred.op {
+                FilterOp::Eq => *value == target,
+                FilterOp::Ne => *value != target,
+                FilterOp::Gt => *value > target,
+                FilterOp::Gte => *value >= target,
+                FilterOp::Lt => *value < target,
+                FilterOp::Lte => *value <= target,
+                _ => unreachable!(),
+            }
         }
+        FilterOp::Between => {
+            let Some((lo, hi)) = pred.between_bounds() else {
+                return false;
+            };
+            let (Some(low), Some(high)) = (operand_decimal(lo, row), operand_decimal(hi, row))
+            else {
+                return false;
+            };
+            *value >= low && *value <= high
+        }
+        FilterOp::In => pred.value.as_list().is_some_and(|items| {
+            items
+                .iter()
+                .any(|item| operand_decimal(item, row) == Some(*value))
+        }),
+        FilterOp::NotIn => pred.value.as_list().is_some_and(|items| {
+            !items
+                .iter()
+                .any(|item| operand_decimal(item, row) == Some(*value))
+        }),
+        FilterOp::Like | FilterOp::Has => {
+            let needle = match &pred.value {
+                PredicateValue::String(s) => s.to_lowercase(),
+                PredicateValue::Decimal(d) => d.normalize().to_string().to_lowercase(),
+                PredicateValue::Bool(b) => b.to_string().to_lowercase(),
+                _ => return false,
+            };
+            value
+                .normalize()
+                .to_string()
+                .to_lowercase()
+                .contains(&needle)
+        }
+        FilterOp::CrossesAbove | FilterOp::CrossesBelow => false,
     }
 }
 

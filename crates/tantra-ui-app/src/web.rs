@@ -19,7 +19,7 @@
 #[cfg(target_arch = "wasm32")]
 use leptos::mount::mount_to_body;
 use leptos::prelude::*;
-use tantra_core::screener::{FilterOp, ScreenerFilterPredicate};
+use tantra_core::screener::{FilterOp, PredicateValue, ScreenerFilterPredicate};
 use tantra_core::types::Money;
 use tantra_ui_core::backtest::BacktestSummary;
 
@@ -147,8 +147,8 @@ fn ScreenerView() -> impl IntoView {
                         .get()
                         .request
                         .filters
-                        .predicates
-                        .iter()
+                        .predicates()
+                        .into_iter()
                         .map(screener_predicate_text)
                         .map(|text| view! { <li>{text}</li> })
                         .map(|v| v.into_any())
@@ -291,7 +291,7 @@ fn PortfolioView() -> impl IntoView {
     }
 }
 
-/// Algo management: list counts and selection summary.
+/// Algo manager: list counts and selection summary.
 #[component]
 fn AlgosView() -> impl IntoView {
     let algos = RwSignal::new(AlgosFeature::new());
@@ -397,21 +397,45 @@ pub fn filter_op_label(op: FilterOp) -> &'static str {
         FilterOp::Lt => "<",
         FilterOp::Lte => "<=",
         FilterOp::Between => "between",
+        FilterOp::In => "in",
+        FilterOp::NotIn => "not in",
+        FilterOp::Like => "like",
+        FilterOp::Has => "has",
+        FilterOp::CrossesAbove => "crosses above",
+        FilterOp::CrossesBelow => "crosses below",
+    }
+}
+
+fn predicate_value_text(value: &PredicateValue) -> String {
+    match value {
+        PredicateValue::Decimal(d) => d.to_string(),
+        PredicateValue::Bool(b) => b.to_string(),
+        PredicateValue::String(s) => s.clone(),
+        PredicateValue::MetricRef(m) => m.0.key.clone(),
+        PredicateValue::List(items) => {
+            let rendered: Vec<String> = items.iter().map(predicate_value_text).collect();
+            format!("[{}]", rendered.join(", "))
+        }
     }
 }
 
 /// Render one drafted filter predicate as text, e.g. `"volume > 1000"`.
 pub fn screener_predicate_text(p: &ScreenerFilterPredicate) -> String {
-    let metric = &p.metric.0.metric;
-    if p.op == FilterOp::Between {
+    let metric = &p.metric.0.key;
+    if let Some((lo, hi)) = p.between_bounds() {
         format!(
             "{} between {} and {}",
             metric,
-            p.value,
-            p.value_upper.unwrap_or_default()
+            predicate_value_text(lo),
+            predicate_value_text(hi)
         )
     } else {
-        format!("{} {} {}", metric, filter_op_label(p.op), p.value)
+        format!(
+            "{} {} {}",
+            metric,
+            filter_op_label(p.op),
+            predicate_value_text(&p.value)
+        )
     }
 }
 

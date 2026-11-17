@@ -13,8 +13,8 @@ use std::str::FromStr;
 
 use rust_decimal::Decimal;
 use tantra_core::screener::{
-    FilterOp, MetricKeySpec, MetricRef, ScreenerFilterGroup, ScreenerFilterPredicate,
-    ScreenerScanRequest,
+    FilterOp, MetricKeySpec, MetricPeriod, MetricRef, PredicateValue, ScreenerFilterGroup,
+    ScreenerFilterItem, ScreenerFilterPredicate, ScreenerScanRequest,
 };
 use tantra_core::types::{Exchange, InstrumentId};
 use tantra_runtime_api::ScreenerQuery;
@@ -52,10 +52,7 @@ pub fn scan_universe() -> Vec<tantra_core::screener::ScreenerRow> {
 
 /// Build a [`MetricRef`] for a metric name at the daily granularity.
 fn metric_ref(name: &str) -> MetricRef {
-    MetricRef(MetricKeySpec {
-        metric: name.to_string(),
-        period: tantra_core::signal::Timeframe::D1,
-    })
+    MetricRef(MetricKeySpec::new(name).with_period(MetricPeriod::D1))
 }
 
 /// Parse a screener query into a [`ScreenerScanRequest`].
@@ -63,7 +60,7 @@ fn metric_ref(name: &str) -> MetricRef {
 /// Supported syntax:
 /// - `metric<op>value` — single predicate, `op` in `{>, <, >=, <=, ==, !=}`
 /// - `metric between <low> <high>` — inclusive range predicate
-/// - `pred1 and pred2` — AND-combined group (`match_all = true`)
+/// - `pred1 and pred2` — AND-combined group (`LogicalOp::And`)
 ///
 /// Metric values are [`Decimal`] — zero floats.
 pub fn parse_query(query: &str) -> Result<ScreenerScanRequest, String> {
@@ -81,7 +78,7 @@ pub fn parse_query(query: &str) -> Result<ScreenerScanRequest, String> {
         return Err("query cannot be empty".to_string());
     }
 
-    let mut predicates = Vec::with_capacity(parts.len());
+    let mut items = Vec::with_capacity(parts.len());
     for part in parts {
         let part = part.trim();
         if let Some((metric, rest)) = part.split_once(" between ") {
@@ -102,12 +99,13 @@ pub fn parse_query(query: &str) -> Result<ScreenerScanRequest, String> {
             let value_upper: Decimal = high
                 .parse()
                 .map_err(|_| format!("invalid upper bound '{high}' for '{metric}'"))?;
-            predicates.push(ScreenerFilterPredicate {
-                metric: metric_ref(metric),
-                op: FilterOp::Between,
-                value,
-                value_upper: Some(value_upper),
-            });
+            items.push(ScreenerFilterItem::Predicate(
+                ScreenerFilterPredicate::between(
+                    metric_ref(metric),
+                    PredicateValue::Decimal(value),
+                    PredicateValue::Decimal(value_upper),
+                ),
+            ));
             continue;
         }
 
@@ -120,9 +118,9 @@ pub fn parse_query(query: &str) -> Result<ScreenerScanRequest, String> {
             (m.trim(), v.trim(), FilterOp::Eq)
         } else if let Some((m, v)) = part.split_once("!=") {
             (m.trim(), v.trim(), FilterOp::Ne)
-        } else if let Some((m, v)) = part.split_once(">") {
+        } else if let Some((m, v)) = part.split_once('>') {
             (m.trim(), v.trim(), FilterOp::Gt)
-        } else if let Some((m, v)) = part.split_once("<") {
+        } else if let Some((m, v)) = part.split_once('<') {
             (m.trim(), v.trim(), FilterOp::Lt)
         } else {
             return Err(format!("no comparison operator in predicate '{part}'"));
@@ -130,20 +128,16 @@ pub fn parse_query(query: &str) -> Result<ScreenerScanRequest, String> {
         let value: Decimal = value_str
             .parse()
             .map_err(|_| format!("invalid value '{value_str}' for '{metric}'"))?;
-        predicates.push(ScreenerFilterPredicate {
-            metric: metric_ref(metric),
+        items.push(ScreenerFilterItem::Predicate(ScreenerFilterPredicate::new(
+            metric_ref(metric),
             op,
-            value,
-            value_upper: None,
-        });
+            PredicateValue::Decimal(value),
+        )));
     }
 
     Ok(ScreenerScanRequest {
         universe: None, // full fixture universe
-        filters: ScreenerFilterGroup {
-            predicates,
-            match_all: true,
-        },
+        filters: ScreenerFilterGroup::and(items),
         sort: None,
         limit: None,
     })
@@ -168,10 +162,7 @@ pub fn default_live_universe() -> Vec<String> {
         .collect()
 }
 
-/// Serialize a [`Decimal`] as a JSON number (the server's wire grammar only
-/// accepts `Value::Number` operands; `rust_decimal`'s default serde emits
-/// strings). Thresholds from `parse_query` are short, exact decimals, so
-/// `Number::from_str` round-trips them losslessly.
+/// Serialize a [`Decimal`] as a JSON number when exact, or string otherwise.
 fn decimal_json(value: &Decimal) -> serde_json::Value {
     match serde_json::Number::from_str(&value.to_string()) {
         Ok(num) => serde_json::Value::Number(num),
@@ -179,40 +170,48 @@ fn decimal_json(value: &Decimal) -> serde_json::Value {
     }
 }
 
-/// Map a canonical [`ScreenerScanRequest`] filter group into the server's wire
-/// shape: `{"operator": "AND"|"OR", "items": [{"key", "op", "value", ...}]}`.
-///
-/// `FilterOp` maps to the server op strings `gt/gte/lt/lte/eq/ne/between`;
-/// operands are JSON numbers (the server rejects strings), and `between` is
-/// encoded as `value: [low, high]` per the server grammar.
-pub fn to_server_filters(request: &ScreenerScanRequest) -> serde_json::Value {
-    let mut items = Vec::with_capacity(request.filters.predicates.len());
-    for p in &request.filters.predicates {
-        let op = match p.op {
-            FilterOp::Gt => "gt",
-            FilterOp::Gte => "gte",
-            FilterOp::Lt => "lt",
-            FilterOp::Lte => "lte",
-            FilterOp::Eq => "eq",
-            FilterOp::Ne => "ne",
-            FilterOp::Between => "between",
-        };
-        let value = if p.op == FilterOp::Between {
-            let upper = p.value_upper.unwrap_or(p.value);
-            serde_json::json!([decimal_json(&p.value), decimal_json(&upper)])
-        } else {
-            decimal_json(&p.value)
-        };
-        items.push(serde_json::json!({
-            "key": p.metric.0.metric,
-            "op": op,
-            "value": value,
-        }));
+fn predicate_value_json(v: &PredicateValue) -> serde_json::Value {
+    match v {
+        PredicateValue::Decimal(d) => decimal_json(d),
+        PredicateValue::Bool(b) => serde_json::Value::Bool(*b),
+        PredicateValue::String(s) => serde_json::Value::String(s.clone()),
+        PredicateValue::MetricRef(m) => serde_json::to_value(m).unwrap_or(serde_json::Value::Null),
+        PredicateValue::List(items) => {
+            serde_json::Value::Array(items.iter().map(predicate_value_json).collect())
+        }
     }
+}
+
+fn filter_group_to_server_json(group: &ScreenerFilterGroup) -> serde_json::Value {
+    let items: Vec<serde_json::Value> = group
+        .items
+        .iter()
+        .map(|item| match item {
+            ScreenerFilterItem::Group(nested) => filter_group_to_server_json(nested),
+            ScreenerFilterItem::Predicate(p) => {
+                let value = if let Some((lo, hi)) = p.between_bounds() {
+                    serde_json::json!([predicate_value_json(lo), predicate_value_json(hi)])
+                } else {
+                    predicate_value_json(&p.value)
+                };
+                serde_json::json!({
+                    "key": p.metric.0.key,
+                    "op": p.op.as_str(),
+                    "value": value,
+                })
+            }
+        })
+        .collect();
     serde_json::json!({
-        "operator": if request.filters.match_all { "AND" } else { "OR" },
+        "operator": group.operator.as_str(),
         "items": items,
     })
+}
+
+/// Map a canonical [`ScreenerScanRequest`] filter group into the server's wire
+/// shape: `{"operator": "AND"|"OR", "items": [{"key", "op", "value", ...}]}`.
+pub fn to_server_filters(request: &ScreenerScanRequest) -> serde_json::Value {
+    filter_group_to_server_json(&request.filters)
 }
 
 /// Render a `reqwest` error with its full source chain, so a transport failure

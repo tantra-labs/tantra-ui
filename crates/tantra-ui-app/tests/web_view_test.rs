@@ -88,6 +88,12 @@ fn filter_op_labels_are_symbolic() {
     assert_eq!(filter_op_label(FilterOp::Lt), "<");
     assert_eq!(filter_op_label(FilterOp::Lte), "<=");
     assert_eq!(filter_op_label(FilterOp::Between), "between");
+    assert_eq!(filter_op_label(FilterOp::In), "in");
+    assert_eq!(filter_op_label(FilterOp::NotIn), "not in");
+    assert_eq!(filter_op_label(FilterOp::Like), "like");
+    assert_eq!(filter_op_label(FilterOp::Has), "has");
+    assert_eq!(filter_op_label(FilterOp::CrossesAbove), "crosses above");
+    assert_eq!(filter_op_label(FilterOp::CrossesBelow), "crosses below");
 }
 
 /// Drafted filter predicates render as `"metric op value"` text.
@@ -109,8 +115,8 @@ fn screener_predicate_text_renders_filters() {
     let texts: Vec<String> = feature
         .request
         .filters
-        .predicates
-        .iter()
+        .predicates()
+        .into_iter()
         .map(screener_predicate_text)
         .collect();
 

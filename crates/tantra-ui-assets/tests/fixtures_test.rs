@@ -2,6 +2,7 @@
 
 use rust_decimal::Decimal;
 use tantra_core::market::Tick;
+use tantra_core::screener::LogicalOp;
 use tantra_ui_assets::fixtures::{
     filter_chips, portfolio_snapshot, reliance, reliance_bars, reliance_quote_tick,
     screener_request, tcs_depth_tick,
@@ -63,8 +64,8 @@ fn portfolio_snapshot_totals_balance() {
 fn screener_fixtures_build_valid_request() {
     let req = screener_request();
     assert_eq!(req.universe.as_ref().map(Vec::len), Some(2));
-    assert_eq!(req.filters.predicates.len(), 2);
-    assert!(req.filters.match_all);
+    assert_eq!(req.filters.predicates().len(), 2);
+    assert_eq!(req.filters.operator, LogicalOp::And);
 
     let chips = filter_chips();
     assert_eq!(chips.len(), 2);
