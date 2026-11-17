@@ -34,8 +34,13 @@ use crate::router::{AppRoute, Router};
 use crate::screener::ScreenerFeature;
 use crate::simulator::SimulatorFeature;
 use crate::studio::{StudioCanvas, StudioNodeKind};
+use crate::studio_ee::{
+    StudioEeFeature, StudioViewport, studio_ee_level_rows, studio_ee_position_rows,
+    studio_ee_regime_text, studio_ee_signal_rows, studio_ee_unavailable,
+};
 use crate::system::{SubsystemState, SystemFeature};
 use crate::watchlist::WatchlistFeature;
+use rust_decimal::Decimal;
 
 /// Mount the whole app into the document body.
 ///
@@ -174,14 +179,70 @@ fn ScreenerView() -> impl IntoView {
     }
 }
 
-/// Strategy Studio: node count, node list, and connection count.
+/// Strategy Studio: the EE+ level-map / signals / positioning view layer
+/// (plan 0006 Phases 2–3) over the existing visual node canvas.
+///
+/// The EE+ sections render the seeded day's level-map bands/lines summary, the
+/// regime chip, the signal markers + SL/3R/5R stop lines, and the positioning
+/// table — all from the pure [`StudioEeFeature`] view-model helpers (headless
+/// friendly: a simple DOM list, no canvas API). When the feature is
+/// `unavailable` an honest note citing the upstream gap is shown instead. The
+/// node-canvas section below is preserved unchanged.
 #[component]
 fn StudioView() -> impl IntoView {
     let canvas = RwSignal::new(StudioCanvas::new());
+    let ee = RwSignal::new(StudioEeFeature::new());
+    // A wide seeded viewport covering every band/stop/target price on the
+    // seeded day (plan 0006 — replaced by live geometry once the REST
+    // endpoints exist).
+    let viewport = StudioViewport::new(Decimal::from(22_500), Decimal::from(25_500), 360, 240);
 
     view! {
         <section class="tantra-panel">
             <h1>{route_title(AppRoute::Studio)}</h1>
+            <h2>"EE+ strategy studio"</h2>
+            {move || {
+                let feature = ee.get();
+                if let Some(note) = studio_ee_unavailable(&feature) {
+                    view! {
+                        <p class="tantra-unavailable">{note}</p>
+                    }.into_any()
+                } else {
+                    view! {
+                        <div>
+                            <h3>"Level map"</h3>
+                            <ul>
+                                {studio_ee_level_rows(&feature, &viewport)
+                                    .into_iter()
+                                    .map(|row| view! { <li>{row}</li> })
+                                    .map(|v| v.into_any())
+                                    .collect::<Vec<_>>()}
+                            </ul>
+                            <h3>"Regime"</h3>
+                            <p class="tantra-regime-badge">{studio_ee_regime_text(&feature)}</p>
+                            <h3>"Signals & stops"</h3>
+                            <ul>
+                                {studio_ee_signal_rows(&feature, &viewport)
+                                    .into_iter()
+                                    .map(|row| view! { <li>{row}</li> })
+                                    .map(|v| v.into_any())
+                                    .collect::<Vec<_>>()}
+                            </ul>
+                            <h3>"Positioning"</h3>
+                            <ul>
+                                {studio_ee_position_rows(&feature)
+                                    .into_iter()
+                                    .map(|(instrument, side_qty, risk)| {
+                                        view! { <li>{instrument} " " {side_qty} " risk " {risk}</li> }
+                                    })
+                                    .map(|v| v.into_any())
+                                    .collect::<Vec<_>>()}
+                            </ul>
+                        </div>
+                    }.into_any()
+                }
+            }}
+            <h2>"Strategy canvas"</h2>
             <p>{move || format!("{} nodes, {} connections", canvas.get().node_count(), canvas.get().connection_count())}</p>
             <ul>
                 {move || {

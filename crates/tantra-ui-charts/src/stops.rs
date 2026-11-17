@@ -17,6 +17,8 @@ pub enum StopKind {
     Trailing,
     /// Breakeven stop.
     Breakeven,
+    /// A take-profit target line (3R/5R runner target).
+    Target,
 }
 
 /// A movable stop line spanning `x0..=x1`.

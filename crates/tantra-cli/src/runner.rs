@@ -95,6 +95,8 @@ pub enum CommandOutcome {
     ServeSuccess(String),
     /// A `paper` session produced a report string (plan 0008 D4).
     PaperSuccess(String),
+    /// The `elephant` command produced the EE+ Strategy Studio report (plan 0006 Phase 4).
+    ElephantReport(String),
 }
 
 /// The CLI home directory (`~/.tantra`, override with `TANTRA_HOME`).
@@ -206,7 +208,16 @@ pub fn run_with_provider(
         Command::Health => run_health(),
         Command::Strategy(args) => run_strategy(args),
         Command::Paper(args) => run_paper(args),
+        Command::Elephant => run_elephant(),
     }
+}
+
+/// Run `tantra elephant`: print the seeded EE+ Strategy Studio report
+/// (level map, signals + SL/3R/5R, positioning table — plan 0006 Phase 4).
+fn run_elephant() -> Result<CommandOutcome, CliError> {
+    Ok(CommandOutcome::ElephantReport(
+        crate::elephant::run_elephant_report(),
+    ))
 }
 
 /// Run `tantra paper`: embedded deterministic engine session or thin-server

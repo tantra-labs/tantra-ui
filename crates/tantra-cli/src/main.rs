@@ -73,6 +73,7 @@ fn main() -> ExitCode {
                 CommandOutcome::StrategySuccess(msg) => println!("{msg}"),
                 CommandOutcome::ServeSuccess(msg) => println!("{msg}"),
                 CommandOutcome::PaperSuccess(msg) => println!("{msg}"),
+                CommandOutcome::ElephantReport(report) => println!("{report}"),
             }
             ExitCode::SUCCESS
         }

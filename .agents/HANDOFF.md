@@ -1,5 +1,20 @@
 # `tantra-ui` — Inter-Agent Handoff (Layer 5)
 
+> Updated: 2026-11-17 — **PLAN 0006 PHASES 2–4 IMPLEMENTED (T12.9 remainder)**:
+> the EE+ Strategy Studio view layer over the shipped chart primitives.
+> `tantra-ui-core/src/ee.rs` is the single shared pure view-model source
+> (`StudioViewport`; `studio_ee_bands/lines/marks/stops/regime/positions`;
+> `ee_seed_*` fixtures; `ee_level_report_rows`/`ee_signal_report_rows`),
+> consumed by (a) the web Studio (`tantra-ui-app/src/studio_ee.rs`
+> `StudioEeFeature` + EE sections in `StudioView`, honest `unavailable` note,
+> existing `StudioCanvas` kept), (b) the TUI (`positioning.rs` EE+ section in
+> the Portfolio tab, `TuiApp::ee_positions` seeded), and (c) the CLI
+> (`tantra elephant` — new `Command::Elephant`/`CliCommand::Elephant` +
+> `CommandOutcome::ElephantReport`, `elephant.rs` report). `StopKind::Target`
+> added to `tantra-ui-charts`; `tantra-ui-core` now depends on
+> `tantra-ui-charts` (wasm-clean, acyclic). Tests: ui-core +8, app +3, tui +3,
+> cli +5 (all Decimal-exact). Plan 0006 status → Phases 2–4 Implemented.
+>
 > Updated: 2026-11-16 — **T14 P3 IMPLEMENTED (plan 0008, all TDD slices
 > U1–U5)**: `tantra-ui-api-wasm/src/paper.rs` `PaperSession` (thin
 > single-user wrapper over the WASM-portable `tantra-exec-paper` engine;
@@ -122,10 +137,13 @@
    (`tantra-ffi` pins the identity in `python/tests/test_paper_golden_identity.py`);
    `golden_parity_test.rs` reads the canonical schema. Next: the paper-trading
    user guide (T14.15, coordinated with `tantra-docs`).
-2. **EE+ Strategy Studio** (plan 0006, proposed): `tantra-ui-charts` level-line /
-   zone-band / marker / entry-SL-TSL primitives (open gap 0007), then Strategy
-   Studio web/TUI/CLI surfaces — blocked on `tantra-core` 0003 / `tantra-market`
-   0005 / `tantra-data` 0016 (root plan 0005).
+2. **EE+ Strategy Studio — DONE (plan 0006 Phases 2–4, T12.9 remainder)**: the
+   shared `tantra-ui-core::ee` view-model helpers now power the web Studio
+   (`StudioEeFeature`/`StudioView` EE sections), the TUI EE+ Positioning
+   section (Portfolio tab), and `tantra elephant`. Remaining when the upstream
+   REST endpoints land: swap the seeded fixtures for live
+   `GET /level-map/{date}` / `GET /signals/{date}` data (drop the `unavailable`
+   note) and wire live `StopUpdate`s into the stop lines (plan 0006 §1.2).
 3. **TUI live-feed consumer**: `TuiApp::publish` is wired but nothing drains an
    `EventStream` into it yet — a tokio feed task (over `tantra-runtime-api-rest`
    `GET /quotes`/`/portfolio/*`/`/orders` or a market feed) would light up the

@@ -426,6 +426,8 @@ pub enum Command {
     Strategy(StrategyArgs),
     /// Run a deterministic paper trading session (embedded engine or server client).
     Paper(PaperArgs),
+    /// Print the EE+ (Elephant Edge) Strategy Studio report (level map, signals, positioning).
+    Elephant,
 }
 
 /// The parsed CLI arguments.
@@ -726,6 +728,8 @@ pub enum CliCommand {
         #[arg(long)]
         server: Option<String>,
     },
+    /// Print the EE+ (Elephant Edge) Strategy Studio report (seeded day).
+    Elephant,
 }
 
 /// Jobs subcommands.
@@ -1235,6 +1239,7 @@ impl From<Cli> for CliArgs {
                 seed,
                 server,
             }),
+            Some(CliCommand::Elephant) => Command::Elephant,
         };
 
         Self {

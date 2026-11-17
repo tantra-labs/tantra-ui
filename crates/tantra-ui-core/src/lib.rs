@@ -16,6 +16,7 @@
 pub mod algos;
 pub mod atoms;
 pub mod backtest;
+pub mod ee;
 pub mod home;
 pub mod portfolio;
 pub mod screener;
@@ -27,6 +28,11 @@ pub use atoms::{
     TrendDirection, TrendPill,
 };
 pub use backtest::{BacktestResultView, BacktestStatus, BacktestSummary};
+pub use ee::{
+    EE_STOP_LABELS, StudioViewport, ee_level_report_rows, ee_seed_last_price, ee_seed_level_map,
+    ee_seed_positions, ee_seed_signals, ee_signal_report_rows, studio_ee_bands, studio_ee_lines,
+    studio_ee_marks, studio_ee_positions, studio_ee_regime, studio_ee_stops,
+};
 pub use home::{AccountSummary, MarketStatus, MarketStatusKind, WatchlistRow, WatchlistViewModel};
 pub use portfolio::{
     PortfolioHoldingRow, PortfolioPositionRow, PortfolioTotals, PortfolioViewModel,

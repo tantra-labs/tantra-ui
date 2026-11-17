@@ -1,6 +1,6 @@
 # 0006 — Elephant Edge (EE+) Strategy Studio
 
-**Status**: Proposed
+**Status**: Phases 2–4 Implemented (2026-11-17, T12.9 remainder); Phase 1 (gap 0007)
 **Target Scope**: `tantra-ui-app` (Leptos 0.8 WASM), `tantra-tui`, `tantra-cli`,
 `tantra-ui-charts`
 **Depends on**: `tantra-ui` gap 0004 (ui-app has no view layer), gap 0007
@@ -68,6 +68,27 @@ Rust REST API already emit (`tantra-core` plan 0003).
   layer work — ui-app grows its first real views).
 - **Phase 3**: signals + stop/target lines + positioning table, live-wired.
 - **Phase 4**: TUI Positioning tab + CLI `elephant` report; docs (root T12).
+
+## 6. Implementation note (Phases 2–4, T12.9 remainder)
+
+Landed as `tantra-ui-core/src/ee.rs` — the single shared pure view-model
+source (`StudioViewport`, `studio_ee_bands`/`studio_ee_lines`/
+`studio_ee_marks`/`studio_ee_stops`/`studio_ee_regime`/`studio_ee_positions`
++ `ee_seed_*` fixtures + `ee_level_report_rows`/`ee_signal_report_rows`),
+consumed by:
+- **Web** (`tantra-ui-app/src/studio_ee.rs` `StudioEeFeature` + `StudioView`
+  sections in `src/web.rs`): level-map zone/line summary, regime chip,
+  signal markers + SL/3R/5R stop rows, positioning table, honest
+  `unavailable` note; the existing `StudioCanvas` node canvas is preserved.
+- **TUI** (`tantra-tui/src/positioning.rs` `positioning_panel_text` — an EE+
+  Positioning section in the Portfolio tab).
+- **CLI** (`tantra-cli/src/elephant.rs` — `tantra elephant` report).
+
+`StopKind::Target` was added to `tantra-ui-charts` for the 3R/5R target lines.
+Entry = referenced level price (`LevelId` encodes it in the seeds); 1R = 1% of
+entry (seeded heuristic). Tests: `tantra-ui-core/tests/ee_test.rs` (8),
+`tantra-ui-app/tests/studio_ee_test.rs` (3), `tantra-tui/tests/positioning_test.rs`
+(3), `tantra-cli/tests/elephant_test.rs` (5), all Decimal-exact.
 
 ## 4. Quality Gates
 

@@ -458,6 +458,16 @@ fn draw_screener(frame: &mut Frame, area: Rect, app: &TuiApp) {
 }
 
 fn draw_portfolio(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    // The Portfolio tab is split: the live snapshot summary on top and the
+    // EE+ positioning panel below (plan 0006 Phase 4 — same `studio_ee_positions`
+    // rows the web Studio and `tantra elephant` render).
+    let chunks =
+        Layout::vertical([Constraint::Percentage(60), Constraint::Percentage(40)]).split(area);
+    draw_portfolio_snapshot(frame, chunks[0], app);
+    draw_ee_positioning(frame, chunks[1], app);
+}
+
+fn draw_portfolio_snapshot(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(Color::DarkGray))
@@ -529,6 +539,17 @@ fn draw_portfolio(frame: &mut Frame, area: Rect, app: &TuiApp) {
     ];
 
     let p = Paragraph::new(lines).block(block);
+    frame.render_widget(p, area);
+}
+
+/// The EE+ positioning panel (plan 0006 Phase 4): renders the same
+/// `studio_ee_positions` rows the web Studio and `tantra elephant` print.
+fn draw_ee_positioning(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::DarkGray))
+        .title(" EE+ Positioning ");
+    let p = Paragraph::new(app.ee_positioning_text()).block(block);
     frame.render_widget(p, area);
 }
 

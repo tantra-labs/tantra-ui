@@ -3,7 +3,9 @@
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use tantra_core::signals::PositionIntent;
 use tantra_ui_core::algos::AlgoStatus;
+use tantra_ui_core::ee::ee_seed_positions;
 use tantra_ui_core::strategy::{
     BacktestReport, OptimizationResult, StrategyBridge, StrategyDescriptor, TradeSuggestion,
 };
@@ -287,6 +289,9 @@ pub struct TuiApp {
     pub optimization_result: Option<OptimizationResult>,
     /// Optimal trade suggestion card for Backtest tab.
     pub trade_suggestion: Option<TradeSuggestion>,
+    /// EE+ positioning intents for the Portfolio-tab positioning panel (ui
+    /// plan 0006 Phase 4); seeded until the live level-map/signals endpoints.
+    pub ee_positions: Vec<PositionIntent>,
 }
 
 impl TuiApp {
@@ -380,6 +385,7 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
             backtest_equity_curve,
             optimization_result,
             trade_suggestion,
+            ee_positions: ee_seed_positions(),
         }
     }
 
@@ -389,6 +395,12 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
     /// ever reads `self.live`.
     pub fn publish(&mut self, ev: tantra_ui_client::ClientEvent) {
         self.live.apply_event(&ev);
+    }
+
+    /// Render the EE+ positioning panel text (ui plan 0006 Phase 4) from the
+    /// app's position-intent slice.
+    pub fn ee_positioning_text(&self) -> String {
+        crate::positioning::positioning_panel_text(&self.ee_positions)
     }
 
     /// Set model name display.

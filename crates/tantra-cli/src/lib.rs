@@ -19,6 +19,7 @@
 pub mod args;
 pub mod backtest_gen;
 pub mod block_render;
+pub mod elephant;
 pub mod jobs_runtime;
 pub mod memory_store;
 pub mod paper;
@@ -33,6 +34,7 @@ pub use args::{
     StrategySuggestArgs, StrategyTuneArgs, VerifyArgs, resolve_log_level,
 };
 pub use backtest_gen::{BacktestQuerySpec, handle_backtest_query, parse_backtest_query};
+pub use elephant::run_elephant_report;
 pub use jobs_runtime::{
     AddRequest, JobRunRecord, JobsRuntime, RunDisposition, RunReceipt, TickReport, boot_recover,
     mint_run_id, short_id,

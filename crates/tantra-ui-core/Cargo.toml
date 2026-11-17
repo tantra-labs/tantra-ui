@@ -12,6 +12,12 @@ name = "tantra_ui_core"
 
 [dependencies]
 tantra-core.workspace = true
+# Chart geometry primitives for the EE+ Strategy Studio view-model helpers
+# (`studio_ee_lines`/`studio_ee_bands`/`studio_ee_marks`/`studio_ee_stops`
+# return `tantra_ui_charts` types shared by the web/TUI/CLI surfaces, plan 0006
+# Phases 2–4). `tantra-ui-charts` is WASM-clean (zero-I/O) so this keeps
+# `tantra-ui-core` wasm32-unknown-unknown-portable.
+tantra-ui-charts.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 rust_decimal.workspace = true

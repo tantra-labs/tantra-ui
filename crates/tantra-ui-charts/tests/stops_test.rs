@@ -84,6 +84,7 @@ fn stop_kind_serde_round_trip() {
         (StopKind::Initial, "initial"),
         (StopKind::Trailing, "trailing"),
         (StopKind::Breakeven, "breakeven"),
+        (StopKind::Target, "target"),
     ];
     for (variant, text) in cases {
         let json = serde_json::to_string(&variant).unwrap();
