@@ -183,6 +183,7 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &TuiApp) {
         ActiveTab::Backtest => draw_backtest(frame, area, app),
         ActiveTab::Algos => draw_algos(frame, area, app),
         ActiveTab::AgentChat => draw_agent_chat(frame, area, app),
+        ActiveTab::StrategyLab => crate::strategy_lab::draw_strategy_lab(frame, area, app),
     }
 }
 
@@ -598,7 +599,7 @@ fn draw_orders(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
 fn draw_footer(frame: &mut Frame, area: Rect, _app: &TuiApp) {
     let footer_text = Line::from(vec![
-        Span::styled(" [Tab / 1-7] ", Style::default().fg(Color::Yellow)),
+        Span::styled(" [Tab / 1-8] ", Style::default().fg(Color::Yellow)),
         Span::raw("Tabs | "),
         Span::styled("[/ or Ctrl+P] ", Style::default().fg(Color::Magenta)),
         Span::raw("Palette | "),

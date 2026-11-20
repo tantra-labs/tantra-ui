@@ -27,6 +27,7 @@ fn tab_titles() {
     assert_eq!(ActiveTab::Backtest.title(), "Backtest");
     assert_eq!(ActiveTab::Algos.title(), "Algos");
     assert_eq!(ActiveTab::AgentChat.title(), "Agent");
+    assert_eq!(ActiveTab::StrategyLab.title(), "StrategyLab");
 }
 
 #[test]
@@ -39,6 +40,7 @@ fn tab_order_wraps() {
         ActiveTab::Backtest,
         ActiveTab::Algos,
         ActiveTab::AgentChat,
+        ActiveTab::StrategyLab,
         ActiveTab::Watchlist,
     ] {
         tab = tab.next();
@@ -46,7 +48,7 @@ fn tab_order_wraps() {
     }
 
     tab = ActiveTab::Watchlist;
-    assert_eq!(tab.previous(), ActiveTab::AgentChat);
+    assert_eq!(tab.previous(), ActiveTab::StrategyLab);
 }
 
 #[test]

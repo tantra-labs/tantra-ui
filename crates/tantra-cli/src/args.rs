@@ -62,6 +62,73 @@ pub enum PaperMode {
     Server,
 }
 
+/// Arguments for `tantra study-loop` and upgraded `tantra elephant` (`Track T21.4`).
+#[derive(Debug, Clone, PartialEq, Eq, Default, Args)]
+pub struct StudyLoopArgs {
+    /// Registered strategy identifier (`elephant_edge_v3`, `orb_15`, etc.).
+    #[arg(long)]
+    pub strategy: Option<String>,
+    /// Target symbol (`NSE:NIFTY50-INDEX`, `NSE:RELIANCE-EQ`, `MCX:GOLD`).
+    #[arg(short, long)]
+    pub symbol: Option<String>,
+    /// Bar timeframe (`1d`, `5m`, `15m`, `1h`, `1m`).
+    #[arg(long)]
+    pub tf: Option<String>,
+    /// Holding horizon in bars after signal entry.
+    #[arg(long)]
+    pub horizon: Option<usize>,
+    /// Derivative expiry horizon (`day`, `weekly`, `monthly`, `commodity_cycle`).
+    #[arg(long)]
+    pub expiry_horizon: Option<String>,
+    /// Outer stop-loss ATR buffer multiplier (`0.00..=3.00`, default `0.25`).
+    #[arg(long)]
+    pub sl_buffer: Option<rust_decimal::Decimal>,
+    /// Entry filter mode (`auto`, `rejection_wick`, `zone_touch_close`, `orb_breakout`).
+    #[arg(long)]
+    pub entry_mode: Option<String>,
+    /// Run IS (70%) / OOS (30%) + DSR parameter sweep & render leaderboard.
+    #[arg(long)]
+    pub sweep: bool,
+    /// Synthesize F&O / Commodity expiry hedge legs & matrix.
+    #[arg(long)]
+    pub hedge: bool,
+    /// Emit structured JSON output (`StrategyLoopViewModel`).
+    #[arg(long)]
+    pub json: bool,
+    /// Export unified 6-layer `OverlayScene` JSON to file path.
+    #[arg(long)]
+    pub export_scene: Option<PathBuf>,
+    /// Live runtime REST base URL (`POST /api/v2/studies/strategy-loop/*`).
+    #[arg(long)]
+    pub server: Option<String>,
+    /// Optional start date (`YYYY-MM-DD`) for `--server` queries.
+    #[arg(long)]
+    pub start_date: Option<String>,
+    /// Optional end date (`YYYY-MM-DD`) for `--server` queries.
+    #[arg(long)]
+    pub end_date: Option<String>,
+}
+
+impl StudyLoopArgs {
+    /// True if any strategy-loop / scene-export / live-server flag was passed.
+    pub fn has_loop_flags(&self) -> bool {
+        self.strategy.is_some()
+            || self.symbol.is_some()
+            || self.tf.is_some()
+            || self.horizon.is_some()
+            || self.expiry_horizon.is_some()
+            || self.sl_buffer.is_some()
+            || self.entry_mode.is_some()
+            || self.sweep
+            || self.hedge
+            || self.json
+            || self.export_scene.is_some()
+            || self.server.is_some()
+            || self.start_date.is_some()
+            || self.end_date.is_some()
+    }
+}
+
 /// Arguments for `tantra paper`.
 #[derive(Debug, Clone, PartialEq, Eq, Args)]
 pub struct PaperArgs {
@@ -426,8 +493,10 @@ pub enum Command {
     Strategy(StrategyArgs),
     /// Run a deterministic paper trading session (embedded engine or server client).
     Paper(PaperArgs),
-    /// Print the EE+ (Elephant Edge) Strategy Studio report (level map, signals, positioning).
-    Elephant,
+    /// Print the EE+ Strategy Studio report or run live strategy-loop evaluation.
+    Elephant(StudyLoopArgs),
+    /// Generic Strategy Loop, Parameter Sweep, Expiry Hedge & OverlayScene CLI (`Track T21.4`).
+    StudyLoop(StudyLoopArgs),
 }
 
 /// The parsed CLI arguments.
@@ -728,8 +797,10 @@ pub enum CliCommand {
         #[arg(long)]
         server: Option<String>,
     },
-    /// Print the EE+ (Elephant Edge) Strategy Studio report (seeded day).
-    Elephant,
+    /// Print the EE+ (Elephant Edge) Strategy Studio report or run strategy loop.
+    Elephant(StudyLoopArgs),
+    /// Run generic Strategy Loop, Parameter Sweep, Expiry Hedge & OverlayScene export.
+    StudyLoop(StudyLoopArgs),
 }
 
 /// Jobs subcommands.
@@ -1239,7 +1310,8 @@ impl From<Cli> for CliArgs {
                 seed,
                 server,
             }),
-            Some(CliCommand::Elephant) => Command::Elephant,
+            Some(CliCommand::Elephant(args)) => Command::Elephant(args),
+            Some(CliCommand::StudyLoop(args)) => Command::StudyLoop(args),
         };
 
         Self {

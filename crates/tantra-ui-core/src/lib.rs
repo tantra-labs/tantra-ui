@@ -19,6 +19,7 @@ pub mod backtest;
 pub mod ee;
 pub mod home;
 pub mod portfolio;
+pub mod scene_projector;
 pub mod screener;
 pub mod strategy;
 
@@ -36,6 +37,18 @@ pub use ee::{
 pub use home::{AccountSummary, MarketStatus, MarketStatusKind, WatchlistRow, WatchlistViewModel};
 pub use portfolio::{
     PortfolioHoldingRow, PortfolioPositionRow, PortfolioTotals, PortfolioViewModel,
+};
+pub use scene_projector::{
+    CanvasCandleGlyph, CanvasGlyph, CanvasGlyphKind, CanvasRectBand, CanvasRightAxisTick,
+    CanvasSegment, CanvasSeriesTrace, CanvasStrokeKind, CanvasTone, HedgeCardView, HedgeLegView,
+    HintInspectorItem, LIVE_RUNTIME_API_SOURCE, LayerPillView, LoopCandle, LoopDeltaSummary,
+    OFFLINE_SEEDED_FIXTURE_SOURCE, PenetrationBucketRow, PenetrationHistogramView,
+    ProjectedSceneCanvas, StopPolicyTableRow, StrategyLoopConfig, StrategyLoopViewModel,
+    SweepLeaderboardRow, build_layer_pills, build_penetration_histogram,
+    evaluate_offline_strategy_loop, format_hedge_card_ascii, format_signed_r,
+    format_stop_comparison_ascii, format_strategy_loop_cli_report, format_sweep_leaderboard_ascii,
+    infer_asset_class, normalize_sparkline_bins, project_overlay_scene,
+    render_penetration_histogram_ascii,
 };
 pub use screener::{
     ScreenerColumn, ScreenerFilterChip, ScreenerRowModel, ScreenerSort, ScreenerSortOrder,

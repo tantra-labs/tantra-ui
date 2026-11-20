@@ -4,10 +4,15 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tantra_core::signals::PositionIntent;
+use tantra_ui_charts::scene::SceneLayerGroup;
 use tantra_ui_core::algos::AlgoStatus;
 use tantra_ui_core::ee::ee_seed_positions;
 use tantra_ui_core::strategy::{
     BacktestReport, OptimizationResult, StrategyBridge, StrategyDescriptor, TradeSuggestion,
+};
+use tantra_ui_core::{
+    StrategyLoopConfig, StrategyLoopViewModel, evaluate_offline_strategy_loop, format_signed_r,
+    infer_asset_class,
 };
 
 use crate::agent_chat::{AgentMessage, AgentRole, ChatTranscript};
@@ -32,11 +37,13 @@ pub enum ActiveTab {
     Algos,
     /// Agent chat.
     AgentChat,
+    /// Interactive 6-layer OverlayScene chart, sweep & hedge workbench (Track T21.4).
+    StrategyLab,
 }
 
 impl ActiveTab {
     /// All tabs in tab-order.
-    pub const ALL: [ActiveTab; 7] = [
+    pub const ALL: [ActiveTab; 8] = [
         ActiveTab::Watchlist,
         ActiveTab::Screener,
         ActiveTab::Portfolio,
@@ -44,6 +51,7 @@ impl ActiveTab {
         ActiveTab::Backtest,
         ActiveTab::Algos,
         ActiveTab::AgentChat,
+        ActiveTab::StrategyLab,
     ];
 
     /// The display title of the tab.
@@ -56,6 +64,7 @@ impl ActiveTab {
             Self::Backtest => "Backtest",
             Self::Algos => "Algos",
             Self::AgentChat => "Agent",
+            Self::StrategyLab => "StrategyLab",
         }
     }
 
@@ -68,21 +77,81 @@ impl ActiveTab {
             Self::Orders => Self::Backtest,
             Self::Backtest => Self::Algos,
             Self::Algos => Self::AgentChat,
-            Self::AgentChat => Self::Watchlist,
+            Self::AgentChat => Self::StrategyLab,
+            Self::StrategyLab => Self::Watchlist,
         }
     }
 
     /// The previous tab in tab-order (wrapping).
     pub fn previous(self) -> Self {
         match self {
-            Self::Watchlist => Self::AgentChat,
+            Self::Watchlist => Self::StrategyLab,
             Self::Screener => Self::Watchlist,
             Self::Portfolio => Self::Screener,
             Self::Orders => Self::Portfolio,
             Self::Backtest => Self::Orders,
             Self::Algos => Self::Backtest,
             Self::AgentChat => Self::Algos,
+            Self::StrategyLab => Self::AgentChat,
         }
+    }
+}
+
+/// Active detail sub-pane inside the `StrategyLab` tab.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum StrategyLabDetailView {
+    #[default]
+    Benchmark,
+    Sweep,
+    Hedges,
+}
+
+impl StrategyLabDetailView {
+    pub fn next(self) -> Self {
+        match self {
+            Self::Benchmark => Self::Sweep,
+            Self::Sweep => Self::Hedges,
+            Self::Hedges => Self::Benchmark,
+        }
+    }
+}
+
+/// Interactive state for the `StrategyLab` tab (`Track T21.4`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StrategyLabState {
+    pub config: StrategyLoopConfig,
+    pub vm: StrategyLoopViewModel,
+    pub selected_hint_index: usize,
+    pub detail_view: StrategyLabDetailView,
+}
+
+impl StrategyLabState {
+    pub fn new() -> Self {
+        let config = StrategyLoopConfig::default();
+        let vm = evaluate_offline_strategy_loop(&config, None);
+        Self {
+            config,
+            vm,
+            selected_hint_index: 0,
+            detail_view: StrategyLabDetailView::Benchmark,
+        }
+    }
+
+    pub fn reeval(&mut self) {
+        let next = evaluate_offline_strategy_loop(&self.config, Some(&self.vm));
+        self.vm = next;
+        if self.vm.hints.is_empty() {
+            self.selected_hint_index = 0;
+        } else {
+            self.selected_hint_index = self.selected_hint_index.min(self.vm.hints.len() - 1);
+        }
+    }
+}
+
+impl Default for StrategyLabState {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -97,6 +166,22 @@ pub struct RegisteredAlgo {
 /// Catalog of built-in Quantcept-compatible slash commands.
 pub const SLASH_COMMANDS: &[(&str, &str)] = &[
     ("/algos", "Switch directly to Algorithm Management tab"),
+    (
+        "/ee-study",
+        "Open Strategy Lab canvas for EE+/ORB (/ee-study [strategy] [symbol] [tf])",
+    ),
+    (
+        "/loop-eval",
+        "Run strategy-loop buffer benchmark (/loop-eval [strategy] [symbol] [sl_buf])",
+    ),
+    (
+        "/loop-sweep",
+        "Run IS/OOS + DSR sweep & plot winner (/loop-sweep [strategy] [symbol])",
+    ),
+    (
+        "/hedge",
+        "Synthesize expiry F&O/Commodity hedge card (/hedge [day|weekly|monthly|commodity_cycle] [symbol])",
+    ),
     (
         "/backtest",
         "Execute backtest on specified or selected strategy (/backtest [strategy])",
@@ -292,6 +377,8 @@ pub struct TuiApp {
     /// EE+ positioning intents for the Portfolio-tab positioning panel (ui
     /// plan 0006 Phase 4); seeded until the live level-map/signals endpoints.
     pub ee_positions: Vec<PositionIntent>,
+    /// Interactive Strategy Lab / Chart state (Track T21.4).
+    pub strategy_lab: StrategyLabState,
 }
 
 impl TuiApp {
@@ -386,6 +473,7 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
             optimization_result,
             trade_suggestion,
             ee_positions: ee_seed_positions(),
+            strategy_lab: StrategyLabState::new(),
         }
     }
 
@@ -437,6 +525,143 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
         };
 
         match cmd {
+            "/ee-study" => {
+                if !arg.is_empty() {
+                    self.strategy_lab.config.strategy_id = arg.to_string();
+                }
+                if let Some(sym) = parts.get(2) {
+                    self.strategy_lab.config.symbol = (*sym).to_string();
+                    self.strategy_lab.config.asset_class = infer_asset_class(sym).to_string();
+                }
+                if let Some(tf) = parts.get(3) {
+                    self.strategy_lab.config.timeframe = (*tf).to_string();
+                }
+                self.strategy_lab.config.entry_trigger_mode = "auto".to_string();
+                self.strategy_lab.detail_view = StrategyLabDetailView::Benchmark;
+                self.strategy_lab.reeval();
+                self.active_tab = ActiveTab::StrategyLab;
+                let vm = &self.strategy_lab.vm;
+                self.chat.push(AgentMessage::new(
+                    AgentRole::System,
+                    format!(
+                        "Strategy Lab ready [{}]: {} on {} ({}) | Net {} | Trap {}% | Recommend: {}",
+                        vm.data_source,
+                        vm.config.strategy_id,
+                        vm.config.symbol,
+                        vm.config.timeframe,
+                        format_signed_r(vm.net_avg_realized_r),
+                        vm.false_sweep_rate_pct.round_dp(1),
+                        vm.recommended_policy_id
+                    ),
+                ));
+            }
+            "/loop-eval" => {
+                if !arg.is_empty() {
+                    self.strategy_lab.config.strategy_id = arg.to_string();
+                }
+                if let Some(sym) = parts.get(2) {
+                    self.strategy_lab.config.symbol = (*sym).to_string();
+                    self.strategy_lab.config.asset_class = infer_asset_class(sym).to_string();
+                }
+                if let Some(buf_str) = parts.get(3) {
+                    if let Ok(buf) = buf_str.parse::<Decimal>() {
+                        self.strategy_lab.config.sl_buffer_atr =
+                            buf.max(Decimal::ZERO).min(Decimal::from(3));
+                    }
+                }
+                self.strategy_lab.config.entry_trigger_mode = "auto".to_string();
+                self.strategy_lab.detail_view = StrategyLabDetailView::Benchmark;
+                self.strategy_lab.reeval();
+                self.active_tab = ActiveTab::StrategyLab;
+                let vm = &self.strategy_lab.vm;
+                let delta_msg = vm
+                    .delta_summary
+                    .as_ref()
+                    .map(|d| format!(" | Δ AvgR {}", format_signed_r(d.avg_r_delta)))
+                    .unwrap_or_default();
+                self.chat.push(AgentMessage::new(
+                    AgentRole::System,
+                    format!(
+                        "Loop Eval [{}]: {} on {} (SL +{}x ATR) → Win {}%, StopOut {}%, Trap {}%, Net {}{}",
+                        vm.data_source,
+                        vm.config.strategy_id,
+                        vm.config.symbol,
+                        vm.config.sl_buffer_atr.round_dp(2),
+                        vm.win_rate_pct.round_dp(1),
+                        vm.stop_out_rate_pct.round_dp(1),
+                        vm.false_sweep_rate_pct.round_dp(1),
+                        format_signed_r(vm.net_avg_realized_r),
+                        delta_msg
+                    ),
+                ));
+            }
+            "/loop-sweep" => {
+                if !arg.is_empty() {
+                    self.strategy_lab.config.strategy_id = arg.to_string();
+                }
+                if let Some(sym) = parts.get(2) {
+                    self.strategy_lab.config.symbol = (*sym).to_string();
+                    self.strategy_lab.config.asset_class = infer_asset_class(sym).to_string();
+                }
+                self.strategy_lab.config.entry_trigger_mode = "auto".to_string();
+                self.strategy_lab.detail_view = StrategyLabDetailView::Sweep;
+                self.strategy_lab.reeval();
+                self.active_tab = ActiveTab::StrategyLab;
+                let vm = &self.strategy_lab.vm;
+                let winner = vm.sweep_rows.first();
+                let summary = match winner {
+                    Some(w) => format!(
+                        "Loop Sweep Winner [{}]: {} on {} → {} (SL +{}x ATR, {}b, {}R) | OOS AvgR {} | WFE {}% | DSR {} | Δ Base {}",
+                        vm.data_source,
+                        vm.config.strategy_id,
+                        vm.config.symbol,
+                        w.candidate_id,
+                        w.sl_buffer_atr.round_dp(2),
+                        w.horizon_bars,
+                        w.target_r.round_dp(0),
+                        format_signed_r(w.oos_avg_r),
+                        w.wfe_pct.round_dp(1),
+                        w.dsr.round_dp(2),
+                        format_signed_r(w.delta_vs_baseline_r),
+                    ),
+                    None => "Loop sweep completed (0 candidates).".to_string(),
+                };
+                self.chat
+                    .push(AgentMessage::new(AgentRole::System, summary));
+            }
+            "/hedge" => {
+                if !arg.is_empty() {
+                    let h = arg.to_lowercase();
+                    if matches!(h.as_str(), "day" | "weekly" | "monthly" | "commodity_cycle") {
+                        self.strategy_lab.config.expiry_horizon = h;
+                    } else {
+                        self.strategy_lab.config.symbol = arg.to_string();
+                        self.strategy_lab.config.asset_class = infer_asset_class(arg).to_string();
+                    }
+                }
+                if let Some(sym) = parts.get(2) {
+                    self.strategy_lab.config.symbol = (*sym).to_string();
+                    self.strategy_lab.config.asset_class = infer_asset_class(sym).to_string();
+                }
+                self.strategy_lab.detail_view = StrategyLabDetailView::Hedges;
+                self.strategy_lab.reeval();
+                self.active_tab = ActiveTab::StrategyLab;
+                let hc = &self.strategy_lab.vm.hedge_card;
+                self.chat.push(AgentMessage::new(
+                    AgentRole::System,
+                    format!(
+                        "Hedge Synthesized [{} | {}]: {} on {} ({} legs) | MaxLoss ₹{} | P95 Gap ₹{} | {}",
+                        hc.horizon,
+                        hc.chain_status,
+                        hc.structure,
+                        self.strategy_lab.vm.config.symbol,
+                        hc.legs.len(),
+                        hc.max_loss_inr.round_dp(2),
+                        hc.p95_stress_loss_inr.round_dp(2),
+                        hc.rationale
+                    ),
+                ));
+            }
             "/algos" => {
                 self.active_tab = ActiveTab::Algos;
                 self.chat.push(AgentMessage::new(
@@ -490,7 +715,7 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
                     for (c, desc) in SLASH_COMMANDS {
                         help.push_str(&format!("  {:<15} {}\n", c, desc));
                     }
-                    help.push_str("\nKeys: [Ctrl+P or /] Palette, [Tab] Autocomplete, [Enter] Run, [Esc] Normal mode, [1-7] Tabs");
+                    help.push_str("\nKeys: [Ctrl+P or /] Palette, [Tab] Autocomplete, [Enter] Run, [Esc] Normal mode, [1-8] Tabs");
                     self.chat.push(AgentMessage::new(AgentRole::System, help));
                 }
             }
@@ -1040,8 +1265,87 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
             }
         }
 
-        // Direct tab switching with digits 1 through 7
-        if let KeyCode::Char(c @ '1'..='7') = key.code {
+        // StrategyLab interactive hotkeys: [1-6] layer toggles, [+/-] SL buffer,
+        // [s/a/t/e/x/m/r] params & views, [Left/Right/n/p] Hint Inspector cursor.
+        if self.active_tab == ActiveTab::StrategyLab && !self.is_input_mode && !self.is_palette_open
+        {
+            match key.code {
+                KeyCode::Char('1') => {
+                    self.strategy_lab.vm.toggle_layer(SceneLayerGroup::Signals);
+                    return;
+                }
+                KeyCode::Char('2') => {
+                    self.strategy_lab.vm.toggle_layer(SceneLayerGroup::Bands);
+                    return;
+                }
+                KeyCode::Char('3') => {
+                    self.strategy_lab.vm.toggle_layer(SceneLayerGroup::Stops);
+                    return;
+                }
+                KeyCode::Char('4') => {
+                    self.strategy_lab
+                        .vm
+                        .toggle_layer(SceneLayerGroup::Indicators);
+                    return;
+                }
+                KeyCode::Char('5') => {
+                    self.strategy_lab.vm.toggle_layer(SceneLayerGroup::Hints);
+                    return;
+                }
+                KeyCode::Char('6') => {
+                    self.strategy_lab.vm.toggle_layer(SceneLayerGroup::Hedges);
+                    return;
+                }
+                KeyCode::Left | KeyCode::Char('p') | KeyCode::Char('P') => {
+                    self.strategy_lab_step_hint(-1);
+                    return;
+                }
+                KeyCode::Right | KeyCode::Char('n') | KeyCode::Char('N') => {
+                    self.strategy_lab_step_hint(1);
+                    return;
+                }
+                KeyCode::Char('+') | KeyCode::Char('=') | KeyCode::Char(']') => {
+                    self.strategy_lab_adjust_buffer(Decimal::new(5, 2));
+                    return;
+                }
+                KeyCode::Char('-') | KeyCode::Char('_') | KeyCode::Char('[') => {
+                    self.strategy_lab_adjust_buffer(Decimal::new(-5, 2));
+                    return;
+                }
+                KeyCode::Char('s') | KeyCode::Char('S') => {
+                    self.strategy_lab_cycle_strategy();
+                    return;
+                }
+                KeyCode::Char('a') | KeyCode::Char('A') => {
+                    self.strategy_lab_cycle_asset();
+                    return;
+                }
+                KeyCode::Char('t') | KeyCode::Char('T') => {
+                    self.strategy_lab_cycle_timeframe();
+                    return;
+                }
+                KeyCode::Char('e') | KeyCode::Char('E') => {
+                    self.strategy_lab_cycle_entry_mode();
+                    return;
+                }
+                KeyCode::Char('x') | KeyCode::Char('X') => {
+                    self.strategy_lab_cycle_expiry();
+                    return;
+                }
+                KeyCode::Char('m') | KeyCode::Char('M') | KeyCode::Char('v') => {
+                    self.strategy_lab.detail_view = self.strategy_lab.detail_view.next();
+                    return;
+                }
+                KeyCode::Char('r') | KeyCode::Char('R') | KeyCode::Enter => {
+                    self.strategy_lab.reeval();
+                    return;
+                }
+                _ => {}
+            }
+        }
+
+        // Direct tab switching with digits 1 through 8
+        if let KeyCode::Char(c @ '1'..='8') = key.code {
             let idx = (c as u8 - b'1') as usize;
             if idx < ActiveTab::ALL.len() {
                 self.active_tab = ActiveTab::ALL[idx];
@@ -1207,6 +1511,84 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
         self.active_tab = ActiveTab::Backtest;
 
         Ok(msg)
+    }
+
+    /// Step the active hint cursor in `StrategyLab` by `delta` (`-1` or `+1`).
+    pub fn strategy_lab_step_hint(&mut self, delta: isize) {
+        let len = self.strategy_lab.vm.hints.len();
+        if len == 0 {
+            self.strategy_lab.selected_hint_index = 0;
+            return;
+        }
+        let cur = self.strategy_lab.selected_hint_index as isize;
+        let next = (cur + delta).rem_euclid(len as isize) as usize;
+        self.strategy_lab.selected_hint_index = next;
+    }
+
+    /// Adjust `sl_buffer_atr` (`0.00..=1.50` ATR) and re-evaluate `StrategyLab`.
+    pub fn strategy_lab_adjust_buffer(&mut self, delta_atr: Decimal) {
+        let next = (self.strategy_lab.config.sl_buffer_atr + delta_atr)
+            .max(Decimal::ZERO)
+            .min(Decimal::new(150, 2));
+        self.strategy_lab.config.sl_buffer_atr = next;
+        self.strategy_lab.reeval();
+    }
+
+    /// Cycle between registered strategies (`elephant_edge_v3` <-> `orb_15`).
+    pub fn strategy_lab_cycle_strategy(&mut self) {
+        self.strategy_lab.config.strategy_id =
+            if self.strategy_lab.config.strategy_id == "elephant_edge_v3" {
+                "orb_15".to_string()
+            } else {
+                "elephant_edge_v3".to_string()
+            };
+        self.strategy_lab.config.entry_trigger_mode = "auto".to_string();
+        self.strategy_lab.reeval();
+    }
+
+    /// Cycle between Index / F&O Equity / MCX Commodity fixtures.
+    pub fn strategy_lab_cycle_asset(&mut self) {
+        let next_sym = match self.strategy_lab.config.symbol.as_str() {
+            "NSE:NIFTY50-INDEX" => "NSE:RELIANCE-EQ",
+            "NSE:RELIANCE-EQ" => "MCX:GOLD",
+            _ => "NSE:NIFTY50-INDEX",
+        };
+        self.strategy_lab.config.symbol = next_sym.to_string();
+        self.strategy_lab.config.asset_class = infer_asset_class(next_sym).to_string();
+        self.strategy_lab.reeval();
+    }
+
+    /// Cycle timeframe (`1d` -> `5m` -> `15m`).
+    pub fn strategy_lab_cycle_timeframe(&mut self) {
+        self.strategy_lab.config.timeframe = match self.strategy_lab.config.timeframe.as_str() {
+            "1d" => "5m".to_string(),
+            "5m" => "15m".to_string(),
+            _ => "1d".to_string(),
+        };
+        self.strategy_lab.reeval();
+    }
+
+    /// Cycle entry filter mode (`rejection_wick` -> `zone_touch_close` -> `orb_breakout`).
+    pub fn strategy_lab_cycle_entry_mode(&mut self) {
+        self.strategy_lab.config.entry_trigger_mode =
+            match self.strategy_lab.config.entry_trigger_mode.as_str() {
+                "rejection_wick" => "zone_touch_close".to_string(),
+                "zone_touch_close" => "orb_breakout".to_string(),
+                _ => "rejection_wick".to_string(),
+            };
+        self.strategy_lab.reeval();
+    }
+
+    /// Cycle F&O/Commodity expiry horizon (`day` -> `weekly` -> `monthly` -> `commodity_cycle`).
+    pub fn strategy_lab_cycle_expiry(&mut self) {
+        self.strategy_lab.config.expiry_horizon =
+            match self.strategy_lab.config.expiry_horizon.as_str() {
+                "day" => "weekly".to_string(),
+                "weekly" => "monthly".to_string(),
+                "monthly" => "commodity_cycle".to_string(),
+                _ => "day".to_string(),
+            };
+        self.strategy_lab.reeval();
     }
 
     fn move_selection(&mut self, action: Action) {

@@ -16,7 +16,7 @@ use tantra_agent_mcp::frontier::ManifestGenerator;
 use crate::args::{
     ApprovalPolicyArg, AskArgs, ChatArgs, CliArgs, Command, DoctorArgs, JobsArgs, MarketplaceArgs,
     McpArgs, MemoryArgs, MissedPolicy, OutputFormat, PaperArgs, PaperMode, PluginArgs, PurgeArgs,
-    ScanArgs, ServeArgs, SkillsArgs, StrategyArgs, ToolsArgs, VerifyArgs,
+    ScanArgs, ServeArgs, SkillsArgs, StrategyArgs, StudyLoopArgs, ToolsArgs, VerifyArgs,
 };
 use crate::jobs_runtime::{AddRequest, JobsRuntime, short_id, summarize_receipt};
 use crate::scan;
@@ -97,6 +97,8 @@ pub enum CommandOutcome {
     PaperSuccess(String),
     /// The `elephant` command produced the EE+ Strategy Studio report (plan 0006 Phase 4).
     ElephantReport(String),
+    /// A `study-loop` (or flagged `elephant`) command produced a strategy-loop report/JSON.
+    StudyLoopReport(String),
 }
 
 /// The CLI home directory (`~/.tantra`, override with `TANTRA_HOME`).
@@ -208,16 +210,21 @@ pub fn run_with_provider(
         Command::Health => run_health(),
         Command::Strategy(args) => run_strategy(args),
         Command::Paper(args) => run_paper(args),
-        Command::Elephant => run_elephant(),
+        Command::Elephant(args) => run_elephant(args),
+        Command::StudyLoop(args) => crate::study_loop::run_study_loop(args),
     }
 }
 
 /// Run `tantra elephant`: print the seeded EE+ Strategy Studio report
 /// (level map, signals + SL/3R/5R, positioning table — plan 0006 Phase 4).
-fn run_elephant() -> Result<CommandOutcome, CliError> {
-    Ok(CommandOutcome::ElephantReport(
-        crate::elephant::run_elephant_report(),
-    ))
+fn run_elephant(args: &StudyLoopArgs) -> Result<CommandOutcome, CliError> {
+    if args.has_loop_flags() {
+        crate::study_loop::run_study_loop(args)
+    } else {
+        Ok(CommandOutcome::ElephantReport(
+            crate::elephant::run_elephant_report(),
+        ))
+    }
 }
 
 /// Run `tantra paper`: embedded deterministic engine session or thin-server

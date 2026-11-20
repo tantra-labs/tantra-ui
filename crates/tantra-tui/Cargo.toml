@@ -5,13 +5,14 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
-description = "Ratatui terminal workstation for the Tantra platform (multi-tab: Watchlist, Screener, Portfolio, Orders, Backtest, Algos, AgentChat)"
+description = "Ratatui terminal workstation for the Tantra platform (multi-tab: Watchlist, Screener, Portfolio, Orders, Backtest, Algos, AgentChat, StrategyLab)"
 
 [lib]
 name = "tantra_tui"
 
 [dependencies]
 tantra-core.workspace = true
+tantra-ui-charts.workspace = true
 tantra-ui-client.workspace = true
 tantra-ui-core.workspace = true
 tantra-highlight.workspace = true

@@ -6,7 +6,7 @@
 use clap::Parser;
 use tantra_cli::args::Cli;
 use tantra_cli::elephant::run_elephant_report;
-use tantra_cli::{CliArgs, Command};
+use tantra_cli::{CliArgs, Command, StudyLoopArgs};
 
 /// The report lists every elephant band with its band prices and score.
 #[test]
@@ -73,5 +73,5 @@ fn elephant_report_is_deterministic() {
 fn elephant_subcommand_parses() {
     let parsed = Cli::try_parse_from(["tantra", "elephant"]).expect("parse elephant subcommand");
     let args: CliArgs = parsed.into();
-    assert_eq!(args.command, Command::Elephant);
+    assert_eq!(args.command, Command::Elephant(StudyLoopArgs::default()));
 }

@@ -74,6 +74,7 @@ fn main() -> ExitCode {
                 CommandOutcome::ServeSuccess(msg) => println!("{msg}"),
                 CommandOutcome::PaperSuccess(msg) => println!("{msg}"),
                 CommandOutcome::ElephantReport(report) => println!("{report}"),
+                CommandOutcome::StudyLoopReport(report) => println!("{report}"),
             }
             ExitCode::SUCCESS
         }

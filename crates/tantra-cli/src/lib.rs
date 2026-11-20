@@ -26,12 +26,13 @@ pub mod paper;
 pub mod runner;
 pub mod scan;
 pub mod strategy_bridge;
+pub mod study_loop;
 
 pub use args::{
     ApprovalPolicyArg, AskArgs, ChatArgs, CliArgs, Command, DoctorArgs, JobsArgs, LogLevel,
     MarketplaceArgs, McpArgs, MemoryArgs, MissedPolicy, OutputFormat, PaperArgs, PaperMode,
     PluginArgs, PurgeArgs, ScanArgs, SkillsArgs, StrategyArgs, StrategyRunArgs, StrategySubcommand,
-    StrategySuggestArgs, StrategyTuneArgs, VerifyArgs, resolve_log_level,
+    StrategySuggestArgs, StrategyTuneArgs, StudyLoopArgs, VerifyArgs, resolve_log_level,
 };
 pub use backtest_gen::{BacktestQuerySpec, handle_backtest_query, parse_backtest_query};
 pub use elephant::run_elephant_report;
@@ -46,3 +47,4 @@ pub use runner::{
     run_purge_with_home, run_skills_with_home, run_tools, run_with_provider,
 };
 pub use strategy_bridge::StrategyBridge;
+pub use study_loop::{config_from_args, run_study_loop};
