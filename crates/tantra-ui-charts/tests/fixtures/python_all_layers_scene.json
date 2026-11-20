@@ -1,0 +1,156 @@
+{
+ "strategy_id": "sample.all-layers",
+ "symbol": "NSE:NIFTY50-INDEX",
+ "timeframe": "1m",
+ "layers": {
+  "signals": true,
+  "bands": true,
+  "stops": true,
+  "indicators": true,
+  "hints": true,
+  "hedges": true
+ },
+ "signals": [
+  {
+   "price": "100.5",
+   "index": 2,
+   "side": "buy",
+   "kind": "sweep"
+  }
+ ],
+ "connectors": [
+  {
+   "from_index": 2,
+   "from_price": "100.5",
+   "to_index": 6,
+   "to_price": "103.25",
+   "side": "buy",
+   "realized_r": "1.5",
+   "stopped_out": false,
+   "label": "T1"
+  }
+ ],
+ "bands": [
+  {
+   "low": "99.5",
+   "high": "100.5",
+   "x0": 0,
+   "x1": 9,
+   "fill_index": 0,
+   "label": "S1"
+  }
+ ],
+ "levels": [
+  {
+   "price": "104",
+   "x0": 0,
+   "x1": 9,
+   "label": "PDH",
+   "style": {
+    "dashed": true,
+    "color_index": 0,
+    "line_width": 1
+   }
+  }
+ ],
+ "stops": [
+  {
+   "price": "98.75",
+   "x0": 2,
+   "x1": 6,
+   "kind": "initial",
+   "previous": "99.25"
+  },
+  {
+   "price": "103.25",
+   "x0": 2,
+   "x1": 6,
+   "kind": "target",
+   "previous": null
+  }
+ ],
+ "indicators": [
+  {
+   "name": "vidya",
+   "points": [
+    {
+     "x": "0",
+     "y": "100"
+    },
+    {
+     "x": "1",
+     "y": "100.25"
+    },
+    {
+     "x": "2",
+     "y": "100.5"
+    },
+    {
+     "x": "3",
+     "y": "100.75"
+    },
+    {
+     "x": "4",
+     "y": "101"
+    },
+    {
+     "x": "5",
+     "y": "101.25"
+    },
+    {
+     "x": "6",
+     "y": "101.5"
+    },
+    {
+     "x": "7",
+     "y": "101.75"
+    },
+    {
+     "x": "8",
+     "y": "102"
+    },
+    {
+     "x": "9",
+     "y": "102.25"
+    }
+   ]
+  },
+  {
+   "name": "pane:center_step",
+   "points": [
+    {
+     "x": "3",
+     "y": "1"
+    }
+   ]
+  }
+ ],
+ "hints": [
+  {
+   "bar_index": 2,
+   "price": "100.5",
+   "severity": "positive",
+   "title": "Sweep",
+   "detail": "S1 reclaimed",
+   "metrics": [
+    {
+     "key": "hit_rate",
+     "value": "0.62"
+    }
+   ]
+  }
+ ],
+ "hedges": [
+  {
+   "role": "protective_put",
+   "side": "buy",
+   "option_kind": "put",
+   "strike": "99",
+   "x0": 2,
+   "x1": 9,
+   "breakeven": "97.5",
+   "max_loss": "150",
+   "summary": "Put hedge"
+  }
+ ]
+}

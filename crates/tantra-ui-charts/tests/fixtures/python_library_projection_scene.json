@@ -1,0 +1,1531 @@
+{
+ "strategy_id": "ind.predictive-ranges",
+ "symbol": "NSE:X",
+ "timeframe": "1d",
+ "layers": {
+  "signals": true,
+  "bands": true,
+  "stops": true,
+  "indicators": true,
+  "hints": true,
+  "hedges": true
+ },
+ "signals": [
+  {
+   "price": "1722",
+   "index": 0,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1725",
+   "index": 1,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1728",
+   "index": 2,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1731",
+   "index": 3,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1734",
+   "index": 4,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1737",
+   "index": 5,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1740",
+   "index": 6,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1743",
+   "index": 7,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1746",
+   "index": 8,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1749",
+   "index": 9,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1752",
+   "index": 10,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1755",
+   "index": 11,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1758",
+   "index": 12,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1761",
+   "index": 13,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1764",
+   "index": 14,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1767",
+   "index": 15,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1770",
+   "index": 16,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1773",
+   "index": 17,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1776",
+   "index": 18,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1779",
+   "index": 19,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1782",
+   "index": 20,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1785",
+   "index": 21,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1788",
+   "index": 22,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1791",
+   "index": 23,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1794",
+   "index": 24,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1797",
+   "index": 25,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1800",
+   "index": 26,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1803",
+   "index": 27,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1806",
+   "index": 28,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1809",
+   "index": 29,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1812",
+   "index": 30,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1815",
+   "index": 31,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1818",
+   "index": 32,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1821",
+   "index": 33,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1824",
+   "index": 34,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1827",
+   "index": 35,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1830",
+   "index": 36,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1833",
+   "index": 37,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1836",
+   "index": 38,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1839",
+   "index": 39,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1842",
+   "index": 40,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1845",
+   "index": 41,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1848",
+   "index": 42,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1851",
+   "index": 43,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1854",
+   "index": 44,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1857",
+   "index": 45,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1860",
+   "index": 46,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1863",
+   "index": 47,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1866",
+   "index": 48,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1869",
+   "index": 49,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1872",
+   "index": 50,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1875",
+   "index": 51,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1878",
+   "index": 52,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1881",
+   "index": 53,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1884",
+   "index": 54,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1887",
+   "index": 55,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1890",
+   "index": 56,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1893",
+   "index": 57,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1896",
+   "index": 58,
+   "side": "sell",
+   "kind": "retest"
+  },
+  {
+   "price": "1899",
+   "index": 59,
+   "side": "sell",
+   "kind": "retest"
+  }
+ ],
+ "connectors": [],
+ "bands": [
+  {
+   "low": "1698",
+   "high": "1704",
+   "x0": 0,
+   "x1": 0,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1710",
+   "high": "1716",
+   "x0": 1,
+   "x1": 4,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1722",
+   "high": "1728",
+   "x0": 5,
+   "x1": 8,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1734",
+   "high": "1740",
+   "x0": 9,
+   "x1": 12,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1746",
+   "high": "1752",
+   "x0": 13,
+   "x1": 16,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1758",
+   "high": "1764",
+   "x0": 17,
+   "x1": 20,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1770",
+   "high": "1776",
+   "x0": 21,
+   "x1": 24,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1782",
+   "high": "1788",
+   "x0": 25,
+   "x1": 28,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1794",
+   "high": "1800",
+   "x0": 29,
+   "x1": 32,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1806",
+   "high": "1812",
+   "x0": 33,
+   "x1": 36,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1818",
+   "high": "1824",
+   "x0": 37,
+   "x1": 40,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1830",
+   "high": "1836",
+   "x0": 41,
+   "x1": 44,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1842",
+   "high": "1848",
+   "x0": 45,
+   "x1": 48,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1854",
+   "high": "1860",
+   "x0": 49,
+   "x1": 52,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1866",
+   "high": "1872",
+   "x0": 53,
+   "x1": 56,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1878",
+   "high": "1884",
+   "x0": 57,
+   "x1": 59,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1716",
+   "high": "1722",
+   "x0": 0,
+   "x1": 0,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1728",
+   "high": "1734",
+   "x0": 1,
+   "x1": 4,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1740",
+   "high": "1746",
+   "x0": 5,
+   "x1": 8,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1752",
+   "high": "1758",
+   "x0": 9,
+   "x1": 12,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1764",
+   "high": "1770",
+   "x0": 13,
+   "x1": 16,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1776",
+   "high": "1782",
+   "x0": 17,
+   "x1": 20,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1788",
+   "high": "1794",
+   "x0": 21,
+   "x1": 24,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1800",
+   "high": "1806",
+   "x0": 25,
+   "x1": 28,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1812",
+   "high": "1818",
+   "x0": 29,
+   "x1": 32,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1824",
+   "high": "1830",
+   "x0": 33,
+   "x1": 36,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1836",
+   "high": "1842",
+   "x0": 37,
+   "x1": 40,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1848",
+   "high": "1854",
+   "x0": 41,
+   "x1": 44,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1860",
+   "high": "1866",
+   "x0": 45,
+   "x1": 48,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1872",
+   "high": "1878",
+   "x0": 49,
+   "x1": 52,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1884",
+   "high": "1890",
+   "x0": 53,
+   "x1": 56,
+   "fill_index": 0,
+   "label": null
+  },
+  {
+   "low": "1896",
+   "high": "1902",
+   "x0": 57,
+   "x1": 59,
+   "fill_index": 0,
+   "label": null
+  }
+ ],
+ "levels": [],
+ "stops": [],
+ "indicators": [
+  {
+   "name": "center",
+   "points": [
+    {
+     "x": "0",
+     "y": "1710"
+    },
+    {
+     "x": "1",
+     "y": "1722"
+    },
+    {
+     "x": "2",
+     "y": "1722"
+    },
+    {
+     "x": "3",
+     "y": "1722"
+    },
+    {
+     "x": "4",
+     "y": "1722"
+    },
+    {
+     "x": "5",
+     "y": "1734"
+    },
+    {
+     "x": "6",
+     "y": "1734"
+    },
+    {
+     "x": "7",
+     "y": "1734"
+    },
+    {
+     "x": "8",
+     "y": "1734"
+    },
+    {
+     "x": "9",
+     "y": "1746"
+    },
+    {
+     "x": "10",
+     "y": "1746"
+    },
+    {
+     "x": "11",
+     "y": "1746"
+    },
+    {
+     "x": "12",
+     "y": "1746"
+    },
+    {
+     "x": "13",
+     "y": "1758"
+    },
+    {
+     "x": "14",
+     "y": "1758"
+    },
+    {
+     "x": "15",
+     "y": "1758"
+    },
+    {
+     "x": "16",
+     "y": "1758"
+    },
+    {
+     "x": "17",
+     "y": "1770"
+    },
+    {
+     "x": "18",
+     "y": "1770"
+    },
+    {
+     "x": "19",
+     "y": "1770"
+    },
+    {
+     "x": "20",
+     "y": "1770"
+    },
+    {
+     "x": "21",
+     "y": "1782"
+    },
+    {
+     "x": "22",
+     "y": "1782"
+    },
+    {
+     "x": "23",
+     "y": "1782"
+    },
+    {
+     "x": "24",
+     "y": "1782"
+    },
+    {
+     "x": "25",
+     "y": "1794"
+    },
+    {
+     "x": "26",
+     "y": "1794"
+    },
+    {
+     "x": "27",
+     "y": "1794"
+    },
+    {
+     "x": "28",
+     "y": "1794"
+    },
+    {
+     "x": "29",
+     "y": "1806"
+    },
+    {
+     "x": "30",
+     "y": "1806"
+    },
+    {
+     "x": "31",
+     "y": "1806"
+    },
+    {
+     "x": "32",
+     "y": "1806"
+    },
+    {
+     "x": "33",
+     "y": "1818"
+    },
+    {
+     "x": "34",
+     "y": "1818"
+    },
+    {
+     "x": "35",
+     "y": "1818"
+    },
+    {
+     "x": "36",
+     "y": "1818"
+    },
+    {
+     "x": "37",
+     "y": "1830"
+    },
+    {
+     "x": "38",
+     "y": "1830"
+    },
+    {
+     "x": "39",
+     "y": "1830"
+    },
+    {
+     "x": "40",
+     "y": "1830"
+    },
+    {
+     "x": "41",
+     "y": "1842"
+    },
+    {
+     "x": "42",
+     "y": "1842"
+    },
+    {
+     "x": "43",
+     "y": "1842"
+    },
+    {
+     "x": "44",
+     "y": "1842"
+    },
+    {
+     "x": "45",
+     "y": "1854"
+    },
+    {
+     "x": "46",
+     "y": "1854"
+    },
+    {
+     "x": "47",
+     "y": "1854"
+    },
+    {
+     "x": "48",
+     "y": "1854"
+    },
+    {
+     "x": "49",
+     "y": "1866"
+    },
+    {
+     "x": "50",
+     "y": "1866"
+    },
+    {
+     "x": "51",
+     "y": "1866"
+    },
+    {
+     "x": "52",
+     "y": "1866"
+    },
+    {
+     "x": "53",
+     "y": "1878"
+    },
+    {
+     "x": "54",
+     "y": "1878"
+    },
+    {
+     "x": "55",
+     "y": "1878"
+    },
+    {
+     "x": "56",
+     "y": "1878"
+    },
+    {
+     "x": "57",
+     "y": "1890"
+    },
+    {
+     "x": "58",
+     "y": "1890"
+    },
+    {
+     "x": "59",
+     "y": "1890"
+    }
+   ]
+  },
+  {
+   "name": "pane:center_step",
+   "points": [
+    {
+     "x": "0",
+     "y": "0"
+    },
+    {
+     "x": "1",
+     "y": "1"
+    },
+    {
+     "x": "2",
+     "y": "0"
+    },
+    {
+     "x": "3",
+     "y": "0"
+    },
+    {
+     "x": "4",
+     "y": "0"
+    },
+    {
+     "x": "5",
+     "y": "1"
+    },
+    {
+     "x": "6",
+     "y": "0"
+    },
+    {
+     "x": "7",
+     "y": "0"
+    },
+    {
+     "x": "8",
+     "y": "0"
+    },
+    {
+     "x": "9",
+     "y": "1"
+    },
+    {
+     "x": "10",
+     "y": "0"
+    },
+    {
+     "x": "11",
+     "y": "0"
+    },
+    {
+     "x": "12",
+     "y": "0"
+    },
+    {
+     "x": "13",
+     "y": "1"
+    },
+    {
+     "x": "14",
+     "y": "0"
+    },
+    {
+     "x": "15",
+     "y": "0"
+    },
+    {
+     "x": "16",
+     "y": "0"
+    },
+    {
+     "x": "17",
+     "y": "1"
+    },
+    {
+     "x": "18",
+     "y": "0"
+    },
+    {
+     "x": "19",
+     "y": "0"
+    },
+    {
+     "x": "20",
+     "y": "0"
+    },
+    {
+     "x": "21",
+     "y": "1"
+    },
+    {
+     "x": "22",
+     "y": "0"
+    },
+    {
+     "x": "23",
+     "y": "0"
+    },
+    {
+     "x": "24",
+     "y": "0"
+    },
+    {
+     "x": "25",
+     "y": "1"
+    },
+    {
+     "x": "26",
+     "y": "0"
+    },
+    {
+     "x": "27",
+     "y": "0"
+    },
+    {
+     "x": "28",
+     "y": "0"
+    },
+    {
+     "x": "29",
+     "y": "1"
+    },
+    {
+     "x": "30",
+     "y": "0"
+    },
+    {
+     "x": "31",
+     "y": "0"
+    },
+    {
+     "x": "32",
+     "y": "0"
+    },
+    {
+     "x": "33",
+     "y": "1"
+    },
+    {
+     "x": "34",
+     "y": "0"
+    },
+    {
+     "x": "35",
+     "y": "0"
+    },
+    {
+     "x": "36",
+     "y": "0"
+    },
+    {
+     "x": "37",
+     "y": "1"
+    },
+    {
+     "x": "38",
+     "y": "0"
+    },
+    {
+     "x": "39",
+     "y": "0"
+    },
+    {
+     "x": "40",
+     "y": "0"
+    },
+    {
+     "x": "41",
+     "y": "1"
+    },
+    {
+     "x": "42",
+     "y": "0"
+    },
+    {
+     "x": "43",
+     "y": "0"
+    },
+    {
+     "x": "44",
+     "y": "0"
+    },
+    {
+     "x": "45",
+     "y": "1"
+    },
+    {
+     "x": "46",
+     "y": "0"
+    },
+    {
+     "x": "47",
+     "y": "0"
+    },
+    {
+     "x": "48",
+     "y": "0"
+    },
+    {
+     "x": "49",
+     "y": "1"
+    },
+    {
+     "x": "50",
+     "y": "0"
+    },
+    {
+     "x": "51",
+     "y": "0"
+    },
+    {
+     "x": "52",
+     "y": "0"
+    },
+    {
+     "x": "53",
+     "y": "1"
+    },
+    {
+     "x": "54",
+     "y": "0"
+    },
+    {
+     "x": "55",
+     "y": "0"
+    },
+    {
+     "x": "56",
+     "y": "0"
+    },
+    {
+     "x": "57",
+     "y": "1"
+    },
+    {
+     "x": "58",
+     "y": "0"
+    },
+    {
+     "x": "59",
+     "y": "0"
+    }
+   ]
+  }
+ ],
+ "hints": [
+  {
+   "bar_index": 10,
+   "price": "1752",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 11,
+   "price": "1755",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 12,
+   "price": "1758",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 13,
+   "price": "1761",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 14,
+   "price": "1764",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 15,
+   "price": "1767",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 16,
+   "price": "1770",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 17,
+   "price": "1773",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 18,
+   "price": "1776",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 19,
+   "price": "1779",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 20,
+   "price": "1782",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 21,
+   "price": "1785",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 22,
+   "price": "1788",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 23,
+   "price": "1791",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 24,
+   "price": "1794",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 25,
+   "price": "1797",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 26,
+   "price": "1800",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 27,
+   "price": "1803",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 28,
+   "price": "1806",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 29,
+   "price": "1809",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 30,
+   "price": "1812",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 31,
+   "price": "1815",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 32,
+   "price": "1818",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 33,
+   "price": "1821",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 34,
+   "price": "1824",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 35,
+   "price": "1827",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 36,
+   "price": "1830",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 37,
+   "price": "1833",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 38,
+   "price": "1836",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 39,
+   "price": "1839",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 40,
+   "price": "1842",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 41,
+   "price": "1845",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 42,
+   "price": "1848",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 43,
+   "price": "1851",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 44,
+   "price": "1854",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 45,
+   "price": "1857",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 46,
+   "price": "1860",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 47,
+   "price": "1863",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 48,
+   "price": "1866",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 49,
+   "price": "1869",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 50,
+   "price": "1872",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 51,
+   "price": "1875",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 52,
+   "price": "1878",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 53,
+   "price": "1881",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 54,
+   "price": "1884",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 55,
+   "price": "1887",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 56,
+   "price": "1890",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 57,
+   "price": "1893",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 58,
+   "price": "1896",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  },
+  {
+   "bar_index": 59,
+   "price": "1899",
+   "severity": "info",
+   "title": "resistance_touch",
+   "detail": "Predictive Ranges Zone Touch",
+   "metrics": []
+  }
+ ],
+ "hedges": []
+}
