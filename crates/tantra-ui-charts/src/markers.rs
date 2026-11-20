@@ -30,10 +30,18 @@ pub enum MarkerKind {
     Retest,
     /// Stop-line touch.
     StopLine,
+    /// Institutional liquidity sweep probe.
+    Sweep,
+    /// Tight stop-loss hunted while outer shield stop survived.
+    SweepSaved,
+    /// Profit target hit (e.g. `2R` / `3R` / `5R`).
+    TargetHit,
+    /// High-momentum institutional elephant candle (`range >= 1.5x ATR`, strong body).
+    ElephantBar,
 }
 
 /// A signal marker anchored at a price and a candle index.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct SignalMarker {
     /// Marker price.
     pub price: Decimal,

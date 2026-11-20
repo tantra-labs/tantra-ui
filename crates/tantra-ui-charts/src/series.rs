@@ -1,12 +1,13 @@
 //! Line / series chart geometry.
 
 use rust_decimal::Decimal;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::axis::{AxisTicks, ChartRange, tick_positions};
 
 /// A single x/y point in a series (both exact Decimal).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ChartPoint {
     /// X coordinate (usually bar index or timestamp-ordered key).
     pub x: Decimal,
@@ -22,7 +23,7 @@ impl ChartPoint {
 }
 
 /// A named series of points.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ChartSeries {
     /// Series name.
     pub name: String,
@@ -60,7 +61,7 @@ impl ChartSeries {
 }
 
 /// A line chart laid out over a pixel viewport.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct LineChart {
     /// The series to draw.
     pub series: Vec<ChartSeries>,

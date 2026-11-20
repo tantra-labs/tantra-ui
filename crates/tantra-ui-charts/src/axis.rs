@@ -1,10 +1,11 @@
 //! Axis range and tick geometry.
 
 use rust_decimal::Decimal;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A value range with explicit bounds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ChartRange {
     /// Inclusive minimum.
     pub min: Decimal,
@@ -34,7 +35,7 @@ impl ChartRange {
 }
 
 /// Tick marks for an axis.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct AxisTicks {
     /// Tick values.
     pub values: Vec<Decimal>,

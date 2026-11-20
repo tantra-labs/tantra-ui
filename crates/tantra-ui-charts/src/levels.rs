@@ -2,6 +2,7 @@
 
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::axis::ChartRange;
@@ -36,7 +37,7 @@ pub(crate) fn price_to_row(
 
 /// Drawing style for a [`LevelLine`] (geometry only — palettes are applied by
 /// the renderer).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct LevelLineStyle {
     /// Whether the line is drawn with dashes.
     pub dashed: bool,
@@ -57,7 +58,7 @@ impl Default for LevelLineStyle {
 }
 
 /// A horizontal level line spanning `x0..=x1` at an exact price.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct LevelLine {
     /// Level price (non-negative).
     pub price: Decimal,

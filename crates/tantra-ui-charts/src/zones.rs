@@ -1,6 +1,7 @@
 //! Shaded price-band zone geometry (Elephant support/resistance, order blocks).
 
 use rust_decimal::Decimal;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::axis::ChartRange;
@@ -8,7 +9,7 @@ use crate::candle::GeometryError;
 use crate::levels::price_to_row;
 
 /// A shaded price band spanning `x0..=x1`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct ZoneBand {
     /// Lower band price.
     pub low: Decimal,

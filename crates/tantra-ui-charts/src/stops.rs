@@ -1,6 +1,7 @@
 //! Stop-line geometry with an update/re-render path (SL / TSL / breakeven).
 
 use rust_decimal::Decimal;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::axis::ChartRange;
@@ -8,7 +9,7 @@ use crate::candle::GeometryError;
 use crate::levels::price_to_row;
 
 /// Kind of a stop line.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum StopKind {
     /// Initial stop-loss.
@@ -22,7 +23,7 @@ pub enum StopKind {
 }
 
 /// A movable stop line spanning `x0..=x1`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct StopLine {
     /// Current stop price (`> 0`).
     pub price: Decimal,
