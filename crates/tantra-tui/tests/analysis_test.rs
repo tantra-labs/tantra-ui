@@ -117,3 +117,27 @@ fn price_history_grows_and_caps() {
     assert!(live.depth(&sym).is_none());
     assert!(live.position(&sym).is_none());
 }
+
+#[test]
+fn detect_instruments_handles_multibyte_text() {
+    let known = vec!["NSE:RELIANCE-EQ".to_string()];
+    let got = tantra_tui::analysis::detect_instruments(
+        "analyze NSE:RELIANCE-EQ 1d — target ₹2,950 ✓, हिन्दी straße NIFTY",
+        &known,
+    );
+    assert!(got.contains(&"NSE:RELIANCE-EQ".to_string()), "{got:?}");
+    assert!(got.contains(&"NSE:NIFTY50-INDEX".to_string()), "{got:?}");
+}
+
+#[test]
+fn streamed_rupee_reply_renders_without_panic() {
+    use ratatui::{Terminal, backend::TestBackend};
+    let mut app = tantra_tui::TuiApp::new();
+    app.submit_prompt("analyze NSE:RELIANCE-EQ 1d".into());
+    let reply = "* Current Price: ₹2,950.40 **up** `0.8%` — हिन्दी ✓";
+    for ch in reply.chars() {
+        app.apply_stream_update(tantra_tui::AgentStreamUpdate::Token(ch.to_string()));
+        let mut t = Terminal::new(TestBackend::new(140, 40)).expect("terminal");
+        t.draw(|f| tantra_tui::draw(f, &app)).expect("draw");
+    }
+}

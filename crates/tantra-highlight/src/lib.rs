@@ -224,6 +224,11 @@ fn highlight_keyworded(src: &str, keywords: &[&str], syntax: LexSyntax) -> Vec<H
     let is_keyword = |word: &str| keywords.contains(&word);
 
     while i < n {
+        // The scan steps bytewise; never slice from inside a multi-byte char (e.g. `₹`).
+        if !src.is_char_boundary(i) {
+            i += 1;
+            continue;
+        }
         let c = bytes[i] as char;
 
         // Line comment: `//` or `#`.
@@ -351,6 +356,11 @@ fn highlight_markdown(src: &str) -> Vec<HighlightSpan> {
     let mut in_fence = false;
 
     while i < n {
+        // The scan steps bytewise; never slice from inside a multi-byte char (e.g. `₹`).
+        if !src.is_char_boundary(i) {
+            i += 1;
+            continue;
+        }
         // Code fence: ``` or ~~~ toggles block mode.
         if src[i..].starts_with("```") || src[i..].starts_with("~~~") {
             let start = i;
