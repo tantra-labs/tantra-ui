@@ -18,7 +18,9 @@ use tokio::sync::mpsc;
 use crate::agent_chat::{AgentMessage, AgentRole, AgentStreamUpdate};
 use crate::agent_link::{AgentConnection, connect, map_client_event};
 use crate::app::TuiApp;
+use crate::market_feed::{PriceFeed, PriceFeedError, PriceStatus, runtime_base};
 use crate::ui;
+use rust_decimal::Decimal;
 
 /// Run the interactive Ratatui terminal workstation.
 ///
@@ -26,6 +28,7 @@ use crate::ui;
 /// then streams turn events into the AgentChat tab.
 pub async fn run_terminal(mut app: TuiApp, conn: AgentConnection) -> Result<(), io::Error> {
     let approve = Arc::new(AtomicBool::new(app.auto_approve));
+    app.runtime_base = runtime_base(&conn);
     let (client, ev_rx) = tokio::time::timeout(
         Duration::from_secs(15),
         connect(&conn, Arc::clone(&approve)),
@@ -86,8 +89,57 @@ async fn run_loop(
     let mut events_open = true;
     sync_models(app, &client);
 
+    let token = match &conn {
+        AgentConnection::Remote { token, .. } => token.clone(),
+        _ => None,
+    };
+    let feed = PriceFeed::new(app.runtime_base.clone(), token);
+    let (px_tx, mut px_rx) = mpsc::channel::<(String, Result<Vec<Decimal>, PriceFeedError>)>(8);
+    let mut last_req: Option<(String, std::time::Instant)> = None;
+
     loop {
         app.tick = app.tick.wrapping_add(1);
+
+        // Price card: fetch daily bars when the focus changes or goes stale.
+        if let Some(sym) = app.analysis.primary().map(str::to_string) {
+            let due = match &last_req {
+                Some((s, at)) => *s != sym || at.elapsed() >= Duration::from_secs(300),
+                None => true,
+            };
+            if due {
+                last_req = Some((sym.clone(), std::time::Instant::now()));
+                app.price_status = PriceStatus::Loading(sym.clone());
+                let feed = feed.clone();
+                let tx = px_tx.clone();
+                let from = chrono::Local::now().date_naive() - chrono::Days::new(120);
+                tokio::spawn(async move {
+                    let res = feed.daily_closes(&sym, from).await;
+                    let _ = tx.send((sym, res)).await;
+                });
+            }
+        }
+        while let Ok((sym, res)) = px_rx.try_recv() {
+            match res {
+                Ok(closes) if closes.len() >= 2 => {
+                    app.live.seed_history(&sym, closes);
+                    app.live.connected = true;
+                    app.price_status = PriceStatus::Ready(sym);
+                }
+                Ok(_) => {
+                    app.price_status = PriceStatus::Failed {
+                        symbol: sym,
+                        error: PriceFeedError::NoBars.to_string(),
+                    }
+                }
+                Err(e) => {
+                    app.price_status = PriceStatus::Failed {
+                        symbol: sym,
+                        error: e.to_string(),
+                    }
+                }
+            }
+        }
+
         approve.store(app.auto_approve, Ordering::Relaxed);
         terminal.draw(|frame| ui::draw(frame, app))?;
 

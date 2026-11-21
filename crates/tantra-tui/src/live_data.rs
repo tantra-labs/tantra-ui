@@ -222,6 +222,16 @@ impl LiveData {
         self.paper_positions.iter().find(|r| r.instrument == symbol)
     }
 
+    /// Replace `symbol`'s price history with `closes` (oldest first),
+    /// keeping only the newest [`PRICE_HISTORY_CAP`] points.
+    pub fn seed_history(&mut self, symbol: &str, closes: impl IntoIterator<Item = Decimal>) {
+        let mut hist: VecDeque<Decimal> = closes.into_iter().collect();
+        while hist.len() > PRICE_HISTORY_CAP {
+            hist.pop_front();
+        }
+        self.price_history.insert(symbol.to_string(), hist);
+    }
+
     fn record_price(&mut self, symbol: &str, price: Decimal) {
         let hist = self.price_history.entry(symbol.to_string()).or_default();
         hist.push_back(price);

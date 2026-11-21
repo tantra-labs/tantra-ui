@@ -26,6 +26,7 @@ pub mod app;
 pub mod keybindings;
 pub mod layout;
 pub mod live_data;
+pub mod market_feed;
 pub mod pane;
 pub mod pane_view;
 pub mod positioning;

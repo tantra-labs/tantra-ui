@@ -449,6 +449,10 @@ pub struct TuiApp {
     pub should_quit: bool,
     /// Live-data state fed by canonical `ClientEvent`s (gap 0005).
     pub live: LiveData,
+    /// Daily-bar fetch status for the Price card.
+    pub price_status: crate::market_feed::PriceStatus,
+    /// Runtime REST base URL (scheme://host[:port]).
+    pub runtime_base: String,
     /// Dynamic analysis page state (right pane of the split Agent view).
     pub analysis: AnalysisPage,
     /// The agent chat transcript.
@@ -578,6 +582,8 @@ impl TuiApp {
             active_tab: ActiveTab::AgentChat,
             should_quit: false,
             live: LiveData::new(),
+            price_status: crate::market_feed::PriceStatus::Idle,
+            runtime_base: crate::market_feed::DEFAULT_RUNTIME_BASE.to_string(),
             analysis: AnalysisPage::default(),
             chat,
             selected_index: 0,

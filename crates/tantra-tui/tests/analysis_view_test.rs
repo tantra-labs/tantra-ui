@@ -60,7 +60,7 @@ fn split_layout_after_first_prompt() {
         }
     }
     assert!(t.contains("ask a follow-up"));
-    assert!(t.contains("no live data"));
+    assert!(t.contains("waiting for prices"));
 }
 
 #[test]

@@ -13,6 +13,7 @@ use tantra_agent_core::DisplayBlock;
 
 use crate::analysis::base_symbol;
 use crate::app::TuiApp;
+use crate::market_feed::{PriceFeedError, PriceStatus};
 use crate::result_block::ResultBlockWidget;
 use crate::theme;
 
@@ -187,19 +188,41 @@ fn draw_price(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let Some(sym) = app.analysis.primary() else {
         return;
     };
-    let block = card_block(&format!("Price · {}", base_symbol(sym)));
+    let hist = app.live.history(sym).filter(|h| h.len() >= 2);
+    let title = if hist.is_some() {
+        format!("Price · {} · 1D", base_symbol(sym))
+    } else {
+        format!("Price · {}", base_symbol(sym))
+    };
+    let block = card_block(&title);
     let inner = block.inner(area);
     frame.render_widget(block, area);
-    let hist = app.live.history(sym);
-    let Some(hist) = hist.filter(|h| h.len() >= 2) else {
-        let line = if !app.live.connected {
-            muted("no live data — run `tantra serve <data_dir>` to stream prices")
-        } else {
-            Line::from(Span::styled(
-                format!("waiting for prices… {}", theme::spinner_frame(app.tick)),
-                theme::fg(theme::ACCENT),
-            ))
+    let Some(hist) = hist else {
+        let base = &app.runtime_base;
+        let text = match &app.price_status {
+            PriceStatus::Loading(s) if s == sym => format!(
+                "loading daily bars from {base}… {}",
+                theme::spinner_frame(app.tick)
+            ),
+            PriceStatus::Failed { symbol, error } if symbol == sym => {
+                if error.starts_with(PriceFeedError::UNREACHABLE_PREFIX) {
+                    format!(
+                        "runtime not reachable at {base} — start it: tantra-ui-web/scripts/start-backend.sh"
+                    )
+                } else if error.starts_with(PriceFeedError::NO_BARS_TEXT) {
+                    format!(
+                        "no daily bars for {} in the runtime's data dir",
+                        base_symbol(sym)
+                    )
+                } else if error == "HTTP 401" || error == "HTTP 403" {
+                    format!("runtime refused the request ({error}) — pass --token-file")
+                } else {
+                    format!("price fetch failed: {error}")
+                }
+            }
+            _ => "waiting for prices…".to_string(),
         };
+        let line = Line::from(Span::styled(text, theme::fg(theme::ACCENT)));
         frame.render_widget(Paragraph::new(line).wrap(Wrap { trim: false }), inner);
         return;
     };
