@@ -124,9 +124,9 @@ pub fn map_client_event(ev: ClientEvent) -> Option<AgentStreamUpdate> {
             elapsed_ms,
             blocks,
         }),
-        ClientEvent::TurnEnded(StopReason::EndTurn | StopReason::MaxTokens) => {
-            Some(AgentStreamUpdate::Finished)
-        }
+        ClientEvent::TurnEnded(
+            StopReason::EndTurn | StopReason::MaxTokens | StopReason::Cancelled,
+        ) => Some(AgentStreamUpdate::Finished),
         ClientEvent::TurnEnded(other) => {
             Some(AgentStreamUpdate::Error(format!("turn ended: {other:?}")))
         }

@@ -61,7 +61,7 @@ fn maps_every_client_event() {
     ));
     assert!(matches!(
         map_client_event(ClientEvent::TurnEnded(StopReason::Cancelled)),
-        Some(AgentStreamUpdate::Error(_))
+        Some(AgentStreamUpdate::Finished)
     ));
     assert!(matches!(
         map_client_event(ClientEvent::Error("boom".into())),

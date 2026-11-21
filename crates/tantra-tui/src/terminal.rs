@@ -26,15 +26,28 @@ use crate::ui;
 /// then streams turn events into the AgentChat tab.
 pub async fn run_terminal(mut app: TuiApp, conn: AgentConnection) -> Result<(), io::Error> {
     let approve = Arc::new(AtomicBool::new(app.auto_approve));
-    let (client, ev_rx) = connect(&conn, Arc::clone(&approve))
-        .await
-        .map_err(|e| io::Error::other(format!("agent connection failed: {e}")))?;
+    let (client, ev_rx) = tokio::time::timeout(
+        Duration::from_secs(15),
+        connect(&conn, Arc::clone(&approve)),
+    )
+    .await
+    .map_err(|_| io::Error::other("agent connection timed out"))?
+    .map_err(|e| io::Error::other(format!("agent connection failed: {e}")))?;
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen)?;
+    if let Err(e) = execute!(stdout, EnterAlternateScreen) {
+        let _ = disable_raw_mode();
+        return Err(e);
+    }
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let mut terminal = match Terminal::new(backend) {
+        Ok(t) => t,
+        Err(e) => {
+            let _ = disable_raw_mode();
+            return Err(e);
+        }
+    };
 
     let res = run_loop(&mut terminal, &mut app, conn, approve, client, ev_rx).await;
 
@@ -85,14 +98,20 @@ async fn run_loop(
         // Fresh session requested (/new, Ctrl+N).
         if app.reset_session {
             app.reset_session = false;
-            match connect(&conn, Arc::clone(&approve)).await {
-                Ok((c, rx)) => {
+            match tokio::time::timeout(
+                Duration::from_secs(10),
+                connect(&conn, Arc::clone(&approve)),
+            )
+            .await
+            {
+                Ok(Ok((c, rx))) => {
                     client = c;
                     ev_rx = rx;
                     events_open = true;
                     sync_models(app, &client);
                 }
-                Err(e) => system_msg(app, format!("New session failed: {e}")),
+                Ok(Err(e)) => system_msg(app, format!("New session failed: {e}")),
+                Err(_) => system_msg(app, "reconnect timed out after 10s".to_string()),
             }
         }
 
@@ -120,13 +139,14 @@ async fn run_loop(
         }
 
         if let Some(id) = app.pending_model.take() {
-            match client.set_model(&id).await {
-                Ok(()) => {
+            match tokio::time::timeout(Duration::from_secs(10), client.set_model(&id)).await {
+                Ok(Ok(())) => {
                     app.model_name = id.clone();
                     app.base_model_name = id.clone();
                     system_msg(app, format!("Model set to {id}"));
                 }
-                Err(e) => system_msg(app, format!("Model switch failed: {e}")),
+                Ok(Err(e)) => system_msg(app, format!("Model switch failed: {e}")),
+                Err(_) => system_msg(app, "model switch timed out after 10s".to_string()),
             }
         }
 
