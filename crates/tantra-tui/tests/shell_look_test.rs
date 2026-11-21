@@ -112,3 +112,37 @@ fn welcome_logo_cells_use_primary_colour() {
     }
     assert!(found);
 }
+
+fn type_str(app: &mut TuiApp, s: &str) {
+    for c in s.chars() {
+        app.on_key(key(KeyCode::Char(c), KeyModifiers::NONE));
+    }
+}
+
+#[test]
+fn composer_keeps_focus_after_submit_on_agent_view() {
+    let mut app = TuiApp::new();
+    type_str(&mut app, "What is NIFTY?");
+    app.on_key(key(KeyCode::Enter, KeyModifiers::NONE));
+    assert_eq!(app.pending_prompt.as_deref(), Some("What is NIFTY?"));
+    assert!(
+        app.is_input_mode,
+        "composer must stay focused for a follow-up"
+    );
+    let (rows, _) = render(&app, 120, 36);
+    assert!(text(&rows).contains("ask a follow-up, or / for commands"));
+}
+
+#[test]
+fn closing_palette_returns_focus_to_composer() {
+    let mut app = TuiApp::new();
+    app.on_key(key(KeyCode::Char('/'), KeyModifiers::NONE));
+    assert!(app.is_palette_open);
+    app.on_key(key(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(!app.is_palette_open);
+    assert!(app.is_input_mode);
+    // typing now goes into the composer instead of triggering view hotkeys
+    type_str(&mut app, "hello");
+    assert_eq!(app.active_tab, ActiveTab::AgentChat);
+    assert_eq!(app.input_buffer, "hello");
+}

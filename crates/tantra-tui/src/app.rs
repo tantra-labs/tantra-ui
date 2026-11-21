@@ -1238,6 +1238,8 @@ impl TuiApp {
                 KeyCode::Esc => {
                     self.is_palette_open = false;
                     self.palette_query.clear();
+                    // Closing the palette hands focus back to the composer on the Agent view.
+                    self.is_input_mode = self.active_tab == ActiveTab::AgentChat;
                 }
                 KeyCode::Up => {
                     self.palette_selected = self.palette_selected.saturating_sub(1);
@@ -1286,6 +1288,7 @@ impl TuiApp {
                             self.input_buffer = format!("{selected_cmd} ");
                         } else {
                             self.execute_slash_command(&selected_cmd);
+                            self.is_input_mode = self.active_tab == ActiveTab::AgentChat;
                         }
                     }
                 }
@@ -1325,6 +1328,8 @@ impl TuiApp {
                         } else {
                             self.submit_prompt(prompt);
                         }
+                        // The composer stays focused for a follow-up on the Agent view.
+                        self.is_input_mode = self.active_tab == ActiveTab::AgentChat;
                     }
                 }
                 KeyCode::Backspace => {
