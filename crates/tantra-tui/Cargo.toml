@@ -18,6 +18,8 @@ tantra-ui-core.workspace = true
 tantra-highlight.workspace = true
 tantra-agent-core.workspace = true
 tantra-agent-chat.workspace = true
+tantra-agent-acp.workspace = true
+agent-client-protocol.workspace = true
 tantra-agent-llm.workspace = true
 tantra-agent-chat-tools.workspace = true
 tokio = { workspace = true, features = ["full"] }

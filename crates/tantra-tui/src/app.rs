@@ -211,6 +211,7 @@ pub const SLASH_COMMANDS: &[(&str, &str)] = &[
         "/agent",
         "Switch or inspect active persona (/agent <name|off|default>)",
     ),
+    ("/model", "List or switch the agent model (/model [id])"),
     ("/new", "Clear context and start a fresh research session"),
     (
         "/resume",
@@ -348,6 +349,7 @@ pub const INFO_PANE_COMMANDS: &[&str] = &[
     "/context",
     "/usage",
     "/jobs",
+    "/model",
     "/checkpoints",
     "/artifacts",
     "/workspaces",
@@ -404,6 +406,7 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
             "/skills",
             "/jobs",
             "/auto",
+            "/model",
         ],
     ),
     (
@@ -464,6 +467,14 @@ pub struct TuiApp {
     pub base_model_name: String,
     /// Prompt pending submission to agent.
     pub pending_prompt: Option<String>,
+    /// Models offered by the connected agent as `(id, display name)`.
+    pub available_models: Vec<(String, String)>,
+    /// Model id the user asked to switch to, applied by the event loop.
+    pub pending_model: Option<String>,
+    /// Set when a fresh agent session is wanted (`/new`, Ctrl+N).
+    pub reset_session: bool,
+    /// Set when the user asks to cancel the running turn.
+    pub cancel_requested: bool,
     /// Whether the command palette modal is open.
     pub is_palette_open: bool,
     /// Current query in command palette.
@@ -576,6 +587,10 @@ impl TuiApp {
             model_name: "unconfigured".to_string(),
             base_model_name: "unconfigured".to_string(),
             pending_prompt: None,
+            available_models: Vec::new(),
+            pending_model: None,
+            reset_session: false,
+            cancel_requested: false,
             is_palette_open: false,
             palette_query: String::new(),
             palette_selected: 0,
@@ -804,6 +819,7 @@ impl TuiApp {
         self.input_buffer.clear();
         self.is_loading = false;
         self.pending_prompt = None;
+        self.reset_session = true;
         self.active_tab = ActiveTab::AgentChat;
         self.is_input_mode = true;
         self.is_palette_open = false;
@@ -1072,7 +1088,30 @@ impl TuiApp {
             "/clear" => {
                 self.chat.clear();
             }
+            "/model" => {
+                if arg.is_empty() {
+                    let mut text = String::from("Models (* = current):");
+                    for (id, name) in &self.available_models {
+                        let mark = if *id == self.model_name { "*" } else { " " };
+                        text.push_str(&format!("\n{mark} {id}  {name}"));
+                    }
+                    if self.available_models.is_empty() {
+                        text.push_str("\n(none reported by the agent)");
+                    }
+                    self.chat.push(AgentMessage::new(AgentRole::System, text));
+                } else if self.available_models.is_empty()
+                    || self.available_models.iter().any(|(id, _)| id == arg)
+                {
+                    self.pending_model = Some(arg.to_string());
+                } else {
+                    self.chat.push(AgentMessage::new(
+                        AgentRole::System,
+                        format!("Unknown model '{arg}' — use /model to list"),
+                    ));
+                }
+            }
             "/new" => {
+                self.reset_session = true;
                 self.panes.clear();
                 self.turn = 0;
                 self.analysis.clear();
@@ -1599,6 +1638,9 @@ impl TuiApp {
                     self.set_tab(self.active_tab.previous());
                 }
                 KeyCode::Esc => {
+                    if self.is_loading {
+                        self.cancel_requested = true;
+                    }
                     self.is_input_mode = false;
                 }
                 KeyCode::Enter => {

@@ -1,8 +1,8 @@
-//! Interactive terminal event loop and LLM stream orchestration.
+//! Interactive terminal event loop; agent turns run over ACP.
 
-use std::collections::HashSet;
 use std::io::{self, Stdout};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use crossterm::event::{self, Event};
@@ -12,34 +12,31 @@ use crossterm::terminal::{
 };
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
-use tokio::sync::{Mutex, mpsc};
+use tantra_agent_acp::{AcpClient, ClientEvent};
+use tokio::sync::mpsc;
 
-use tantra_agent_chat::{
-    CancellationToken, InMemorySessionStore, PermissionDecision, SessionEvent, ToolOutcome,
-    ToolRegistry, TurnConfig, TurnId, TurnOutcome, run_turn,
-};
-use tantra_agent_core::{PersistedMessage, SessionStore};
-use tantra_agent_llm::LlmProvider;
-
-use crate::agent_chat::AgentStreamUpdate;
+use crate::agent_chat::{AgentMessage, AgentRole, AgentStreamUpdate};
+use crate::agent_link::{AgentConnection, connect, map_client_event};
 use crate::app::TuiApp;
 use crate::ui;
 
 /// Run the interactive Ratatui terminal workstation.
 ///
-/// Handles terminal setup/teardown, event loop polling, and live token
-/// streaming between the in-process LLM provider and the AgentChat tab.
-pub async fn run_terminal(
-    mut app: TuiApp,
-    provider: Arc<dyn LlmProvider>,
-) -> Result<(), io::Error> {
+/// Connects to the agent (embedded or remote ACP) before entering raw mode,
+/// then streams turn events into the AgentChat tab.
+pub async fn run_terminal(mut app: TuiApp, conn: AgentConnection) -> Result<(), io::Error> {
+    let approve = Arc::new(AtomicBool::new(app.auto_approve));
+    let (client, ev_rx) = connect(&conn, Arc::clone(&approve))
+        .await
+        .map_err(|e| io::Error::other(format!("agent connection failed: {e}")))?;
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let res = run_loop(&mut terminal, &mut app, provider).await;
+    let res = run_loop(&mut terminal, &mut app, conn, approve, client, ev_rx).await;
 
     // Clean teardown
     disable_raw_mode()?;
@@ -49,152 +46,94 @@ pub async fn run_terminal(
     res
 }
 
-const SYSTEM_PROMPT: &str = "You are Tantra, an intelligent quantitative finance and algorithmic trading assistant for Indian equities (NSE/BSE).";
+fn sync_models(app: &mut TuiApp, client: &AcpClient) {
+    app.model_name = client.model().to_string();
+    app.base_model_name = app.model_name.clone();
+    app.available_models = client
+        .models()
+        .iter()
+        .map(|m| (m.id.clone(), m.name.clone()))
+        .collect();
+}
+
+fn system_msg(app: &mut TuiApp, text: String) {
+    app.chat.push(AgentMessage::new(AgentRole::System, text));
+}
 
 async fn run_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut TuiApp,
-    provider: Arc<dyn LlmProvider>,
+    conn: AgentConnection,
+    approve: Arc<AtomicBool>,
+    client: AcpClient,
+    ev_rx: mpsc::Receiver<ClientEvent>,
 ) -> Result<(), io::Error> {
-    let (token_tx, mut token_rx) = mpsc::channel::<AgentStreamUpdate>(128);
-
-    let mut registry = ToolRegistry::new();
-    registry.register_all(tantra_agent_chat_tools::catalog::create_strategy_tools(
-        None,
-    ));
-    registry.register_all(tantra_agent_chat_tools::catalog::create_presentation_tools());
-    let tools = Arc::new(registry.snapshot());
-    let system_prompt = format!(
-        "{SYSTEM_PROMPT}\n\n{}",
-        tantra_agent_chat_tools::PRESENT_VIEW_GUIDANCE
-    );
-    let store: Arc<dyn SessionStore> = Arc::new(InMemorySessionStore::new());
-    let history: Arc<Mutex<Vec<PersistedMessage>>> = Arc::new(Mutex::new(Vec::new()));
-    let grants: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
-    let mut turn_counter: u64 = 0;
+    let mut client = client;
+    let mut ev_rx = ev_rx;
+    let mut events_open = true;
+    sync_models(app, &client);
 
     loop {
         app.tick = app.tick.wrapping_add(1);
+        approve.store(app.auto_approve, Ordering::Relaxed);
         terminal.draw(|frame| ui::draw(frame, app))?;
 
         if app.should_quit {
             break;
         }
 
-        // Drain any incoming tokens from background streaming task
-        while let Ok(update) = token_rx.try_recv() {
-            app.apply_stream_update(update);
+        // Fresh session requested (/new, Ctrl+N).
+        if app.reset_session {
+            app.reset_session = false;
+            match connect(&conn, Arc::clone(&approve)).await {
+                Ok((c, rx)) => {
+                    client = c;
+                    ev_rx = rx;
+                    events_open = true;
+                    sync_models(app, &client);
+                }
+                Err(e) => system_msg(app, format!("New session failed: {e}")),
+            }
         }
 
-        // Check if user submitted a prompt on the Agent tab
-        if let Some(prompt) = app.pending_prompt.take() {
-            turn_counter += 1;
-            let turn = turn_counter;
-            let auto_approve = app.auto_approve;
-            let provider = Arc::clone(&provider);
-            let tools = Arc::clone(&tools);
-            let store = Arc::clone(&store);
-            let history = Arc::clone(&history);
-            let grants = Arc::clone(&grants);
-            let system_prompt = system_prompt.clone();
-            let tx = token_tx.clone();
-
-            tokio::spawn(async move {
-                let (ev_tx, mut ev_rx) = mpsc::channel::<SessionEvent>(256);
-                let fwd_tx = tx.clone();
-                let forwarder = tokio::spawn(async move {
-                    while let Some(ev) = ev_rx.recv().await {
-                        let update = match ev {
-                            SessionEvent::TextDelta { text, .. } => {
-                                Some(AgentStreamUpdate::Token(text))
-                            }
-                            SessionEvent::ToolStarted {
-                                call_id,
-                                name,
-                                summary,
-                                ..
-                            } => Some(AgentStreamUpdate::ToolStarted {
-                                call_id: format!("{call_id:?}"),
-                                name,
-                                summary,
-                            }),
-                            SessionEvent::ToolFinished {
-                                call_id,
-                                name,
-                                outcome,
-                                elapsed_ms,
-                                blocks,
-                                ..
-                            } => Some(AgentStreamUpdate::ToolFinished {
-                                call_id: format!("{call_id:?}"),
-                                name,
-                                ok: matches!(outcome, ToolOutcome::Success),
-                                elapsed_ms,
-                                blocks,
-                            }),
-                            SessionEvent::PermissionRequested(mut prompt) => {
-                                if let Some(responder) = prompt.responder.take() {
-                                    let decision = if auto_approve {
-                                        PermissionDecision::AllowOnce
-                                    } else {
-                                        PermissionDecision::Deny {
-                                            feedback: Some(
-                                                "not approved — enable /auto to let the agent run this tool"
-                                                    .into(),
-                                            ),
-                                        }
-                                    };
-                                    let _ = responder.respond(decision);
-                                }
-                                None
-                            }
-                            SessionEvent::TurnEnded { outcome, .. } => {
-                                Some(turn_outcome_update(&outcome))
-                            }
-                            _ => None,
-                        };
-                        if let Some(u) = update {
-                            if fwd_tx.send(u).await.is_err() {
-                                break;
-                            }
-                        }
-                    }
-                });
-
-                let hist = history.lock().await.clone();
-                let grant_set = grants.lock().await.clone();
-                let result = run_turn(
-                    None,
-                    TurnId(turn),
-                    &system_prompt,
-                    hist,
-                    &prompt,
-                    Vec::new(),
-                    &tools,
-                    provider,
-                    store,
-                    ev_tx,
-                    &TurnConfig::default(),
-                    CancellationToken::new(),
-                    grant_set,
-                )
-                .await;
-                let _ = forwarder.await;
-                match result {
-                    Ok((outcome, new_history, new_grants)) => {
-                        *history.lock().await = new_history;
-                        *grants.lock().await = new_grants;
-                        // TurnEnded normally carries this already; resending is idempotent
-                        // for Finished and covers a turn that ended without the event.
-                        if matches!(turn_outcome_update(&outcome), AgentStreamUpdate::Finished) {
-                            let _ = tx.send(AgentStreamUpdate::Finished).await;
-                        }
-                    }
-                    Err(e) => {
-                        let _ = tx.send(AgentStreamUpdate::Error(e.to_string())).await;
+        // Drain agent events.
+        while events_open {
+            match ev_rx.try_recv() {
+                Ok(ev) => {
+                    if let Some(update) = map_client_event(ev) {
+                        app.apply_stream_update(update);
                     }
                 }
-            });
+                Err(mpsc::error::TryRecvError::Empty) => break,
+                Err(mpsc::error::TryRecvError::Disconnected) => {
+                    events_open = false;
+                    app.apply_stream_update(AgentStreamUpdate::Error(
+                        "agent connection closed".to_string(),
+                    ));
+                }
+            }
+        }
+
+        if app.cancel_requested {
+            app.cancel_requested = false;
+            client.cancel().await;
+        }
+
+        if let Some(id) = app.pending_model.take() {
+            match client.set_model(&id).await {
+                Ok(()) => {
+                    app.model_name = id.clone();
+                    app.base_model_name = id.clone();
+                    system_msg(app, format!("Model set to {id}"));
+                }
+                Err(e) => system_msg(app, format!("Model switch failed: {e}")),
+            }
+        }
+
+        if let Some(prompt) = app.pending_prompt.take() {
+            if let Err(e) = client.prompt(prompt).await {
+                app.apply_stream_update(AgentStreamUpdate::Error(e.to_string()));
+            }
         }
 
         // Poll for input with short timeout for responsive token rendering
@@ -210,7 +149,8 @@ async fn run_loop(
 
 /// Map a terminal turn outcome to the transcript update: a clean finish, or an
 /// error line the user can see (a failed provider, a refusal, a round limit).
-pub fn turn_outcome_update(outcome: &TurnOutcome) -> AgentStreamUpdate {
+pub fn turn_outcome_update(outcome: &tantra_agent_chat::TurnOutcome) -> AgentStreamUpdate {
+    use tantra_agent_chat::TurnOutcome;
     match outcome {
         TurnOutcome::Completed | TurnOutcome::MaxTokens => AgentStreamUpdate::Finished,
         TurnOutcome::Failed { error } => AgentStreamUpdate::Error(error.message.clone()),

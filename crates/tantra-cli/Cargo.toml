@@ -25,6 +25,7 @@ tantra-tui.workspace = true
 tantra-highlight.workspace = true
 tantra-agent-core.workspace = true
 tantra-agent-chat.workspace = true
+tantra-agent-acp.workspace = true
 tantra-agent-llm.workspace = true
 tantra-agent-chat-tools.workspace = true
 tantra-agent-mcp = { path = "../../../tantra-agent/crates/tantra-agent-mcp" }

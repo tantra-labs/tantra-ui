@@ -5,8 +5,8 @@ use std::process::ExitCode;
 
 use tantra_cli::args::parse;
 use tantra_cli::jobs_runtime::boot_recover;
-use tantra_cli::runner::{CliError, CommandOutcome, resolve_provider, run, tantra_home_dir};
-use tantra_tui::TuiApp;
+use tantra_cli::runner::{CliError, CommandOutcome, resolve_catalog, run, tantra_home_dir};
+use tantra_tui::{AgentConnection, TuiApp};
 
 fn main() -> ExitCode {
     let cli = parse();
@@ -25,25 +25,47 @@ fn main() -> ExitCode {
                         return ExitCode::SUCCESS;
                     }
 
-                    let resolved = match resolve_provider(
-                        cli.config.as_deref(),
-                        cli.model.as_deref(),
-                    ) {
-                        Ok(Some(r)) => r,
-                        Ok(None) => {
-                            eprintln!(
-                                "tantra: no LLM configured — create tantra.jsonc (see tantra-agent/docs/design/provider-config.md) or pass --config <path>"
-                            );
-                            return ExitCode::from(2);
-                        }
-                        Err(e) => {
-                            eprintln!("tantra: {e}");
-                            return ExitCode::from(2);
-                        }
+                    let (conn, label) = if let Some(url) = cli.server.clone() {
+                        let token = match cli.token_file.as_deref() {
+                            Some(path) => match std::fs::read_to_string(path) {
+                                Ok(t) => Some(t.trim().to_string()),
+                                Err(e) => {
+                                    eprintln!("tantra: cannot read --token-file: {}", e.kind());
+                                    return ExitCode::from(2);
+                                }
+                            },
+                            None => None,
+                        };
+                        let label = url.clone();
+                        (AgentConnection::Remote { url, token }, label)
+                    } else {
+                        let catalog = match resolve_catalog(
+                            cli.config.as_deref(),
+                            cli.model.as_deref(),
+                        ) {
+                            Ok(Some(c)) => c,
+                            Ok(None) => {
+                                eprintln!(
+                                    "tantra: no LLM configured — create tantra.jsonc (see tantra-agent/docs/design/provider-config.md) or pass --config <path>"
+                                );
+                                return ExitCode::from(2);
+                            }
+                            Err(e) => {
+                                eprintln!("tantra: {e}");
+                                return ExitCode::from(2);
+                            }
+                        };
+                        let label = cli.model.clone().unwrap_or_else(|| catalog.default_model());
+                        (
+                            AgentConnection::Embedded {
+                                catalog,
+                                model: cli.model.clone(),
+                            },
+                            label,
+                        )
                     };
-                    let provider = resolved.provider;
 
-                    let mut app = TuiApp::new().with_model_name(resolved.id.clone());
+                    let mut app = TuiApp::new().with_model_name(label);
                     if cli.skip_permissions {
                         app.auto_approve = true;
                     }
@@ -53,7 +75,7 @@ fn main() -> ExitCode {
 
                     let rt = tokio::runtime::Runtime::new().expect("failed to start tokio runtime");
 
-                    if let Err(e) = rt.block_on(tantra_tui::run_terminal(app, provider)) {
+                    if let Err(e) = rt.block_on(tantra_tui::run_terminal(app, conn)) {
                         eprintln!("tantra: tui error: {e}");
                         return ExitCode::from(1);
                     }

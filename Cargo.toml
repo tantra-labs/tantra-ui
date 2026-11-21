@@ -32,6 +32,8 @@ tantra-ui = { path = "crates/tantra-ui" }
 # tantra-agent workspace.
 tantra-agent-core = { path = "../tantra-agent/crates/tantra-agent-core" }
 tantra-agent-chat = { path = "../tantra-agent/crates/tantra-agent-chat" }
+tantra-agent-acp = { path = "../tantra-agent/crates/tantra-agent-acp" }
+agent-client-protocol = "=5.0.0"
 tantra-agent-chat-tools = { path = "../tantra-agent/crates/tantra-agent-chat-tools" }
 tantra-agent-llm = { path = "../tantra-agent/crates/tantra-agent-llm" }
 tantra-agent-prompt = { path = "../tantra-agent/crates/tantra-agent-prompt" }

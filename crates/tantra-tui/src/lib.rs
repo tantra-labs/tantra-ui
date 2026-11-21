@@ -19,6 +19,7 @@
 //!   `ratatui::TestBackend` + scripted key fixtures (no live terminal).
 
 pub mod agent_chat;
+pub mod agent_link;
 pub mod analysis;
 pub mod analysis_view;
 pub mod app;
@@ -37,6 +38,7 @@ pub mod ui;
 pub use agent_chat::{
     AgentMessage, AgentRole, AgentStreamUpdate, ChatTranscript, ToolRow, ToolStatus,
 };
+pub use agent_link::AgentConnection;
 pub use analysis::{AnalysisPage, ToolCard};
 pub use app::{ActiveTab, StrategyLabDetailView, StrategyLabState, TuiApp};
 pub use keybindings::{Action, KeyBinding, handle_key};

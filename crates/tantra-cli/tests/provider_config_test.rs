@@ -65,3 +65,18 @@ fn model_and_config_flags_parse() {
     assert_eq!(args.model.as_deref(), Some("local/m2"));
     assert_eq!(args.config, Some(PathBuf::from("/x/tantra.jsonc")));
 }
+
+#[test]
+fn server_and_token_file_flags_parse_into_cli_args() {
+    let args: CliArgs = Cli::try_parse_from([
+        "tantra",
+        "--server",
+        "ws://h/v1/acp",
+        "--token-file",
+        "/tmp/t",
+    ])
+    .expect("parse cli")
+    .into();
+    assert_eq!(args.server.as_deref(), Some("ws://h/v1/acp"));
+    assert_eq!(args.token_file, Some(PathBuf::from("/tmp/t")));
+}

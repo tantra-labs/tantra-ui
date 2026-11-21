@@ -523,6 +523,10 @@ pub struct CliArgs {
     pub resume: Option<String>,
     /// Optional initial message for terminal launch.
     pub message: Option<String>,
+    /// Runtime ACP endpoint the TUI connects to instead of the embedded agent.
+    pub server: Option<String>,
+    /// File holding the bearer token for `--server`.
+    pub token_file: Option<PathBuf>,
 }
 
 impl Default for CliArgs {
@@ -539,6 +543,8 @@ impl Default for CliArgs {
             r#continue: false,
             resume: None,
             message: None,
+            server: None,
+            token_file: None,
         }
     }
 }
@@ -630,6 +636,14 @@ pub struct Cli {
     #[arg(short = 'r', long = "resume", global = true)]
     pub resume: Option<String>,
 
+    /// Connect the TUI to a runtime ACP endpoint, e.g. ws://127.0.0.1:8000/v1/acp, instead of the embedded agent.
+    #[arg(long = "server", value_name = "WS_URL")]
+    pub server: Option<String>,
+
+    /// File holding the bearer token for --server.
+    #[arg(long = "token-file", value_name = "PATH")]
+    pub token_file: Option<PathBuf>,
+
     #[command(subcommand)]
     pub command: Option<CliCommand>,
 }
@@ -648,6 +662,8 @@ impl Default for Cli {
             skip_permissions: false,
             r#continue: false,
             resume: None,
+            server: None,
+            token_file: None,
             command: None,
         }
     }
@@ -1331,6 +1347,8 @@ impl From<Cli> for CliArgs {
             r#continue: cli.r#continue,
             resume: cli.resume,
             message,
+            server: cli.server,
+            token_file: cli.token_file,
         }
     }
 }

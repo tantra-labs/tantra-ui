@@ -163,6 +163,40 @@ pub fn resolve_provider(
     }))
 }
 
+/// Resolve the model catalog for the embedded ACP agent from `tantra.jsonc`
+/// (or an explicit `--config`). `Ok(None)` means no config file exists.
+pub fn resolve_catalog(
+    config: Option<&Path>,
+    model: Option<&str>,
+) -> Result<Option<Arc<dyn tantra_agent_acp::ModelCatalog>>, CliError> {
+    let loaded = match load_config(config) {
+        Ok(l) => l,
+        Err(ConfigError::NotFound { .. }) => return Ok(None),
+        Err(e) => {
+            return Err(CliError::Execution(format!(
+                "invalid LLM provider config: {e}"
+            )));
+        }
+    };
+    let catalog = ConfigCatalog::build(&loaded, &|k| std::env::var(k).ok())
+        .map_err(|e| CliError::Execution(format!("invalid LLM provider config: {e}")))?;
+    let Some(id) = model else {
+        return Ok(Some(Arc::new(catalog)));
+    };
+    let models = catalog.models();
+    if !models.iter().any(|m| m.id == id) {
+        let list = models
+            .iter()
+            .map(|m| m.id.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(CliError::Execution(format!(
+            "unknown model '{id}' — configured: {list}"
+        )));
+    }
+    Ok(Some(Arc::new(catalog.with_default(id))))
+}
+
 /// Dispatch a parsed command using default provider resolution.
 pub fn run(cli: &CliArgs) -> Result<CommandOutcome, CliError> {
     let resolved = resolve_provider(cli.config.as_deref(), cli.model.as_deref())?;
