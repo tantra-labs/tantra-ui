@@ -169,7 +169,11 @@ pub fn draw(frame: &mut Frame, app: &TuiApp) {
 
 fn draw_welcome(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let area = pad(area, 2, 2, 0);
-    let block_h: u16 = 8 + 3 + 1 + 3;
+    let bw = ((area.width as u32 * 40 / 100) as u16)
+        .max(48)
+        .min(area.width);
+    let comp_h = composer_rows(app, "ask a finance question, or type / for commands", bw);
+    let block_h: u16 = 8 + 3 + 1 + comp_h;
     let rem = area.height.saturating_sub(block_h);
     let top = rem * 7 / 15;
     let logo_area = sub(area, 0, top, area.width, 8);
@@ -207,15 +211,12 @@ fn draw_welcome(frame: &mut Frame, area: Rect, app: &TuiApp) {
         sub(logo_area, lx + 16 + 3, 1, wm_w, 5),
     );
 
-    let bw = ((area.width as u32 * 40 / 100) as u16)
-        .max(48)
-        .min(area.width);
     let bx = area.width.saturating_sub(bw) / 2;
     let by = top + 8 + 3;
     draw_input_header(frame, sub(area, bx, by, bw, 1), app);
     draw_composer(
         frame,
-        sub(area, bx, by + 1, bw, 3),
+        sub(area, bx, by + 1, bw, comp_h),
         app,
         "ask a finance question, or type / for commands",
     );
@@ -223,13 +224,19 @@ fn draw_welcome(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
 fn draw_workspace(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let area = pad(area, 1, 1, 1);
+    let placeholder = if app.active_tab == ActiveTab::AgentChat {
+        "ask a follow-up, or / for commands"
+    } else {
+        "press i to ask, / for commands"
+    };
+    let comp_h = composer_rows(app, placeholder, area.width);
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(0),
             Constraint::Length(1),
             Constraint::Length(1),
-            Constraint::Length(3),
+            Constraint::Length(comp_h),
         ])
         .split(area);
     if app.active_tab == ActiveTab::AgentChat {
@@ -238,11 +245,6 @@ fn draw_workspace(frame: &mut Frame, area: Rect, app: &TuiApp) {
         draw_content(frame, rows[0], app);
     }
     draw_input_header(frame, rows[2], app);
-    let placeholder = if app.active_tab == ActiveTab::AgentChat {
-        "ask a follow-up, or / for commands"
-    } else {
-        "press i to ask, / for commands"
-    };
     draw_composer(frame, rows[3], app, placeholder);
 }
 
@@ -401,28 +403,72 @@ fn draw_input_header(frame: &mut Frame, area: Rect, app: &TuiApp) {
     }
 }
 
+/// Text shown inside the composer: the buffer (with cursor when focused) or the placeholder.
+fn composer_text(app: &TuiApp, placeholder: &str) -> String {
+    if app.input_buffer.is_empty() {
+        if app.is_input_mode {
+            placeholder.to_string()
+        } else {
+            "press i to ask, / for commands".to_string()
+        }
+    } else if app.is_input_mode {
+        format!("{}▋", app.input_buffer)
+    } else {
+        app.input_buffer.clone()
+    }
+}
+
+/// Number of greedy word-wrapped rows of `text` at `width` columns.
+fn wrapped_rows(text: &str, width: usize) -> usize {
+    let width = width.max(1);
+    let mut rows = 0usize;
+    for para in text.split('\n') {
+        let mut cur = 0usize;
+        let mut para_rows = 1usize;
+        for word in para.split(' ') {
+            let mut len = word.chars().count();
+            if cur > 0 {
+                if cur + 1 + len <= width {
+                    cur += 1 + len;
+                    continue;
+                }
+                para_rows += 1;
+            }
+            while len > width {
+                para_rows += 1;
+                len -= width;
+            }
+            cur = len;
+        }
+        rows += para_rows;
+    }
+    rows
+}
+
+/// Composer height: 2 border rows plus 1..=6 word-wrapped text rows at `inner_width`.
+pub fn composer_height(text: &str, inner_width: u16) -> u16 {
+    let rows = wrapped_rows(text, inner_width as usize).clamp(1, 6);
+    2 + rows as u16
+}
+
+fn composer_rows(app: &TuiApp, placeholder: &str, width: u16) -> u16 {
+    composer_height(&composer_text(app, placeholder), width.saturating_sub(4))
+}
+
 fn draw_composer(frame: &mut Frame, area: Rect, app: &TuiApp, placeholder: &str) {
     let block = theme::field_block(app.is_input_mode);
     let inner = pad(block.inner(area), 1, 1, 0);
     frame.render_widget(block, area);
-    let line = if app.input_buffer.is_empty() {
-        let ph = if app.is_input_mode {
-            placeholder
-        } else {
-            "press i to ask, / for commands"
-        };
-        Line::from(Span::styled(ph.to_string(), theme::fg(theme::TEXT_MUTED)))
+    let text = composer_text(app, placeholder);
+    let style = if app.input_buffer.is_empty() {
+        theme::fg(theme::TEXT_MUTED)
     } else {
-        let mut spans = vec![Span::styled(
-            app.input_buffer.clone(),
-            theme::fg(theme::TEXT),
-        )];
-        if app.is_input_mode {
-            spans.push(Span::styled("▋", theme::fg(theme::TEXT_MUTED)));
-        }
-        Line::from(spans)
+        theme::fg(theme::TEXT)
     };
-    frame.render_widget(Paragraph::new(line), inner);
+    frame.render_widget(
+        Paragraph::new(Span::styled(text, style)).wrap(Wrap { trim: false }),
+        inner,
+    );
 }
 
 fn draw_footer(frame: &mut Frame, area: Rect) {
@@ -608,10 +654,10 @@ fn draw_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
 }
 
 fn draw_watchlist(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Watchlist — Indian Equities & Indices (NSE) ");
+    let block = theme::panel_block(
+        "Watchlist — Indian Equities & Indices (NSE)",
+        theme::PRIMARY,
+    );
 
     if app.live.watchlist.is_empty() {
         render_empty_state(
@@ -627,7 +673,7 @@ fn draw_watchlist(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let header = Row::new(vec!["Symbol", "Instrument", "LTP (₹)", "Change", "Volume"]).style(
         Style::default()
-            .fg(Color::Cyan)
+            .fg(theme::PRIMARY)
             .add_modifier(Modifier::BOLD),
     );
 
@@ -637,9 +683,9 @@ fn draw_watchlist(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .iter()
         .map(|w| {
             let color = if w.change >= Decimal::ZERO {
-                Color::Green
+                theme::SUCCESS
             } else {
-                Color::Red
+                theme::ERROR
             };
             Row::new(vec![
                 w.symbol.clone(),
@@ -668,20 +714,15 @@ fn draw_watchlist(frame: &mut Frame, area: Rect, app: &TuiApp) {
 fn render_empty_state(frame: &mut Frame, area: Rect, block: Block<'static>, message: &str) {
     let text = vec![
         Line::from(""),
-        Line::from(vec![Span::styled(
-            "  No data yet.",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )]),
+        Line::from(vec![Span::styled("  No data yet.", theme::fg(theme::TEXT))]),
         Line::from(vec![Span::styled(
             format!("  {message}"),
-            Style::default().fg(Color::White),
+            Style::default().fg(theme::TEXT_MUTED),
         )]),
         Line::from(vec![Span::styled(
             "  Live data arrives as canonical `ClientEvent`s published to \
              `TuiApp::publish` (gap 0005 wiring seam).",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(theme::TEXT_MUTED),
         )]),
     ];
 
@@ -690,10 +731,7 @@ fn render_empty_state(frame: &mut Frame, area: Rect, block: Block<'static>, mess
 }
 
 fn draw_screener(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Neural AST Screener — Scan Results ");
+    let block = theme::panel_block("Neural AST Screener — Scan Results", theme::PRIMARY);
 
     if app.live.screener.is_empty() {
         render_empty_state(
@@ -715,7 +753,7 @@ fn draw_screener(frame: &mut Frame, area: Rect, app: &TuiApp) {
     ])
     .style(
         Style::default()
-            .fg(Color::Cyan)
+            .fg(theme::PRIMARY)
             .add_modifier(Modifier::BOLD),
     );
 
@@ -731,7 +769,7 @@ fn draw_screener(frame: &mut Frame, area: Rect, app: &TuiApp) {
             while cells.len() < 5 {
                 cells.push(String::new());
             }
-            Row::new(cells).style(Style::default().fg(Color::White))
+            Row::new(cells).style(Style::default().fg(theme::TEXT))
         })
         .collect();
 
@@ -758,10 +796,7 @@ fn draw_portfolio(frame: &mut Frame, area: Rect, app: &TuiApp) {
 }
 
 fn draw_portfolio_snapshot(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Portfolio Snapshot ");
+    let block = theme::panel_block("Portfolio Snapshot", theme::PRIMARY);
 
     let Some(portfolio) = &app.live.portfolio else {
         render_empty_state(
@@ -775,9 +810,9 @@ fn draw_portfolio_snapshot(frame: &mut Frame, area: Rect, app: &TuiApp) {
     };
 
     let pnl_color = if portfolio.total_pnl >= Decimal::ZERO {
-        Color::Green
+        theme::SUCCESS
     } else {
-        Color::Red
+        theme::ERROR
     };
     let pnl_sign = if portfolio.total_pnl >= Decimal::ZERO {
         "+"
@@ -788,43 +823,43 @@ fn draw_portfolio_snapshot(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let lines = vec![
         Line::from(""),
         Line::from(vec![
-            Span::styled("  Cash:          ", Style::default().fg(Color::DarkGray)),
+            Span::styled("  Cash:          ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("₹{:.2}", portfolio.cash),
                 Style::default()
-                    .fg(Color::White)
+                    .fg(theme::TEXT)
                     .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
-            Span::styled("  Net Worth:     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("  Net Worth:     ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("₹{:.2}", portfolio.net_worth),
                 Style::default()
-                    .fg(Color::White)
+                    .fg(theme::TEXT)
                     .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
-            Span::styled("  Total PnL:     ", Style::default().fg(Color::DarkGray)),
+            Span::styled("  Total PnL:     ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("{pnl_sign}{:.2}", portfolio.total_pnl),
                 Style::default().fg(pnl_color).add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(vec![
-            Span::styled("  Open Positions:", Style::default().fg(Color::DarkGray)),
+            Span::styled("  Open Positions:", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("{}", portfolio.positions),
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme::PRIMARY)
                     .add_modifier(Modifier::BOLD),
             ),
         ]),
         Line::from(""),
         Line::from(Span::styled(
             "  FIFO tax-lots, unrealized STCG/LTCG, and real-time MTM valuation.",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(theme::TEXT_MUTED),
         )),
     ];
 
@@ -835,19 +870,13 @@ fn draw_portfolio_snapshot(frame: &mut Frame, area: Rect, app: &TuiApp) {
 /// The EE+ positioning panel (plan 0006 Phase 4): renders the same
 /// `studio_ee_positions` rows the web Studio and `tantra elephant` print.
 fn draw_ee_positioning(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" EE+ Positioning ");
+    let block = theme::panel_block("EE+ Positioning", theme::ACCENT);
     let p = Paragraph::new(app.ee_positioning_text()).block(block);
     frame.render_widget(p, area);
 }
 
 fn draw_orders(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Orders & OMS ");
+    let block = theme::panel_block("Orders & OMS", theme::PRIMARY);
 
     if app.live.orders.is_empty() {
         render_empty_state(
@@ -862,7 +891,7 @@ fn draw_orders(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let header = Row::new(vec!["Order ID", "Kind", "Status"]).style(
         Style::default()
-            .fg(Color::Cyan)
+            .fg(theme::PRIMARY)
             .add_modifier(Modifier::BOLD),
     );
 
@@ -872,7 +901,7 @@ fn draw_orders(frame: &mut Frame, area: Rect, app: &TuiApp) {
         .iter()
         .map(|o| {
             Row::new(vec![o.order_id.clone(), o.kind.clone(), o.status.clone()])
-                .style(Style::default().fg(Color::White))
+                .style(Style::default().fg(theme::TEXT))
         })
         .collect();
 
@@ -913,7 +942,7 @@ fn draw_algos(frame: &mut Frame, area: Rect, app: &TuiApp) {
     ])
     .style(
         Style::default()
-            .fg(Color::Cyan)
+            .fg(theme::PRIMARY)
             .add_modifier(Modifier::BOLD),
     );
 
@@ -921,10 +950,10 @@ fn draw_algos(frame: &mut Frame, area: Rect, app: &TuiApp) {
     for (idx, algo) in app.algos.iter().enumerate() {
         let is_selected = idx == app.selected_algo_index;
         let (status_str, _status_color) = match algo.status {
-            AlgoStatus::Active => ("● Active", Color::Green),
-            AlgoStatus::Paused => ("❚❚ Paused", Color::Yellow),
-            AlgoStatus::Stopped => ("■ Stopped", Color::Red),
-            AlgoStatus::Error => ("✖ Error", Color::LightRed),
+            AlgoStatus::Active => ("● Active", theme::SUCCESS),
+            AlgoStatus::Paused => ("❚❚ Paused", theme::WARNING),
+            AlgoStatus::Stopped => ("■ Stopped", theme::ERROR),
+            AlgoStatus::Error => ("✖ Error", theme::ERROR),
         };
 
         let inst_str = algo.descriptor.target_instruments.join(", ");
@@ -936,11 +965,11 @@ fn draw_algos(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
         let row_style = if is_selected {
             Style::default()
-                .fg(Color::Black)
-                .bg(Color::Cyan)
+                .fg(theme::BACKGROUND)
+                .bg(theme::PRIMARY)
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::White)
+            Style::default().fg(theme::TEXT)
         };
 
         rows.push(
@@ -955,10 +984,7 @@ fn draw_algos(frame: &mut Frame, area: Rect, app: &TuiApp) {
         );
     }
 
-    let left_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Registered Algorithms (60%) ");
+    let left_block = theme::panel_block("Registered Algorithms (60%)", theme::PRIMARY);
 
     let widths = [
         Constraint::Percentage(32),
@@ -972,10 +998,10 @@ fn draw_algos(frame: &mut Frame, area: Rect, app: &TuiApp) {
     frame.render_widget(table, left_area);
 
     // Right Panel: Selected Strategy Details & Parameter Inspector
-    let right_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Selected Strategy & Parameter Inspector (40%) ");
+    let right_block = theme::panel_block(
+        "Selected Strategy & Parameter Inspector (40%)",
+        theme::ACCENT,
+    );
 
     let mut details_lines = Vec::new();
     if let Some(selected) = app.selected_algo() {
@@ -983,45 +1009,45 @@ fn draw_algos(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Span::styled(
                 "Strategy: ",
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme::PRIMARY)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 &selected.descriptor.name,
                 Style::default()
-                    .fg(Color::White)
+                    .fg(theme::TEXT)
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 format!(" ({})", selected.descriptor.id),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(theme::TEXT_MUTED),
             ),
         ]));
         details_lines.push(Line::from(vec![
-            Span::styled("Version:  ", Style::default().fg(Color::Cyan)),
+            Span::styled("Version:  ", Style::default().fg(theme::PRIMARY)),
             Span::styled(
                 &selected.descriptor.version,
-                Style::default().fg(Color::White),
+                Style::default().fg(theme::TEXT),
             ),
-            Span::styled(" | Origin: ", Style::default().fg(Color::Cyan)),
+            Span::styled(" | Origin: ", Style::default().fg(theme::PRIMARY)),
             Span::styled(
                 selected.descriptor.source.as_str(),
-                Style::default().fg(Color::Yellow),
+                Style::default().fg(theme::WARNING),
             ),
         ]));
         details_lines.push(Line::from(vec![
-            Span::styled("Status:   ", Style::default().fg(Color::Cyan)),
+            Span::styled("Status:   ", Style::default().fg(theme::PRIMARY)),
             Span::styled(
                 selected.status.as_str(),
                 Style::default().fg(match selected.status {
-                    AlgoStatus::Active => Color::Green,
-                    AlgoStatus::Paused => Color::Yellow,
-                    _ => Color::Red,
+                    AlgoStatus::Active => theme::SUCCESS,
+                    AlgoStatus::Paused => theme::WARNING,
+                    _ => theme::ERROR,
                 }),
             ),
             Span::styled(
                 format!(" | Baseline Sharpe: {:.2}", selected.baseline_sharpe),
-                Style::default().fg(Color::White),
+                Style::default().fg(theme::TEXT),
             ),
         ]));
         details_lines.push(Line::from(""));
@@ -1029,18 +1055,18 @@ fn draw_algos(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Span::styled(
                 "Description: ",
                 Style::default()
-                    .fg(Color::DarkGray)
+                    .fg(theme::TEXT_MUTED)
                     .add_modifier(Modifier::ITALIC),
             ),
             Span::styled(
                 &selected.descriptor.description,
-                Style::default().fg(Color::White),
+                Style::default().fg(theme::TEXT),
             ),
         ]));
         details_lines.push(Line::from(""));
         details_lines.push(Line::from(Span::styled(
             "─── Parameter Search Contract ──────────────────────────",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(theme::TEXT_MUTED),
         )));
 
         for p in &selected.descriptor.parameters {
@@ -1053,29 +1079,35 @@ fn draw_algos(frame: &mut Frame, area: Rect, app: &TuiApp) {
                 Span::styled(
                     format!(" • {:<15} ", p.name),
                     Style::default()
-                        .fg(Color::LightBlue)
+                        .fg(theme::ACCENT)
                         .add_modifier(Modifier::BOLD),
                 ),
                 Span::styled(
                     format!("Default: {:<5} ", p.default),
-                    Style::default().fg(Color::White),
+                    Style::default().fg(theme::TEXT),
                 ),
-                Span::styled(format!("[{range_str}]"), Style::default().fg(Color::Yellow)),
+                Span::styled(
+                    format!("[{range_str}]"),
+                    Style::default().fg(theme::WARNING),
+                ),
             ]));
             if !p.description.is_empty() {
                 details_lines.push(Line::from(Span::styled(
                     format!("   ↳ {}", p.description),
-                    Style::default().fg(Color::DarkGray),
+                    Style::default().fg(theme::TEXT_MUTED),
                 )));
             }
         }
 
         details_lines.push(Line::from(""));
         details_lines.push(Line::from(vec![
-            Span::styled("Target Instruments: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "Target Instruments: ",
+                Style::default().fg(theme::TEXT_MUTED),
+            ),
             Span::styled(
                 selected.descriptor.target_instruments.join(", "),
-                Style::default().fg(Color::Green),
+                Style::default().fg(theme::SUCCESS),
             ),
         ]));
     } else {
@@ -1092,32 +1124,32 @@ fn draw_algos(frame: &mut Frame, area: Rect, app: &TuiApp) {
         Span::styled(
             " [Enter] ",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme::WARNING)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("Backtest | "),
         Span::styled(
             "[T] ",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme::WARNING)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("Tune Params | "),
         Span::styled(
             "[S] ",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme::WARNING)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("Suggest Trade | "),
         Span::styled(
             "[Space] ",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme::WARNING)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("Toggle Status | "),
-        Span::styled("[↑/↓ or j/k] ", Style::default().fg(Color::Cyan)),
+        Span::styled("[↑/↓ or j/k] ", Style::default().fg(theme::PRIMARY)),
         Span::raw("Navigate"),
     ]);
     let action_bar = Paragraph::new(action_line).alignment(Alignment::Center);
@@ -1149,17 +1181,14 @@ fn draw_backtest(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let q4_area = bottom_quads[1];
 
     // Q1: Top Left - KPI Cards
-    let q1_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Key Performance Indicators (KPIs) ");
+    let q1_block = theme::panel_block("Key Performance Indicators (KPIs)", theme::PRIMARY);
 
     let mut kpi_lines = Vec::new();
     if let Some(ref r) = app.backtest_report {
         let pnl_color = if r.net_pnl >= Decimal::ZERO {
-            Color::Green
+            theme::SUCCESS
         } else {
-            Color::Red
+            theme::ERROR
         };
         let pnl_sign = if r.net_pnl >= Decimal::ZERO { "+" } else { "" };
         let ret_sign = if r.total_return_pct >= Decimal::ZERO {
@@ -1170,29 +1199,35 @@ fn draw_backtest(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
         kpi_lines.push(Line::from(""));
         kpi_lines.push(Line::from(vec![
-            Span::styled("  Initial Capital: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "  Initial Capital: ",
+                Style::default().fg(theme::TEXT_MUTED),
+            ),
             Span::styled(
                 format!("₹{:.2}", r.initial_capital),
                 Style::default()
-                    .fg(Color::White)
+                    .fg(theme::TEXT)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled("   Final Equity: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("   Final Equity: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("₹{:.2}", r.final_equity),
                 Style::default()
-                    .fg(Color::White)
+                    .fg(theme::TEXT)
                     .add_modifier(Modifier::BOLD),
             ),
         ]));
         kpi_lines.push(Line::from(""));
         kpi_lines.push(Line::from(vec![
-            Span::styled("  Net Profit/Loss: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "  Net Profit/Loss: ",
+                Style::default().fg(theme::TEXT_MUTED),
+            ),
             Span::styled(
                 format!("{}{:.2}", pnl_sign, r.net_pnl),
                 Style::default().fg(pnl_color).add_modifier(Modifier::BOLD),
             ),
-            Span::styled("   Total Return: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("   Total Return: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("{}{:.2}%", ret_sign, r.total_return_pct),
                 Style::default().fg(pnl_color).add_modifier(Modifier::BOLD),
@@ -1200,40 +1235,46 @@ fn draw_backtest(frame: &mut Frame, area: Rect, app: &TuiApp) {
         ]));
         kpi_lines.push(Line::from(""));
         kpi_lines.push(Line::from(vec![
-            Span::styled("  Sharpe Ratio:    ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "  Sharpe Ratio:    ",
+                Style::default().fg(theme::TEXT_MUTED),
+            ),
             Span::styled(
                 format!("{:.2}", r.sharpe_ratio),
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme::PRIMARY)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled("   Max Drawdown: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("   Max Drawdown: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("{:.2}%", r.max_drawdown_pct),
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(theme::WARNING)
                     .add_modifier(Modifier::BOLD),
             ),
         ]));
         kpi_lines.push(Line::from(""));
         kpi_lines.push(Line::from(vec![
-            Span::styled("  Total Trades:    ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                "  Total Trades:    ",
+                Style::default().fg(theme::TEXT_MUTED),
+            ),
             Span::styled(
                 format!("{}", r.total_trades),
-                Style::default().fg(Color::White),
+                Style::default().fg(theme::TEXT),
             ),
             Span::styled(
                 "         Win Rate:     ",
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(theme::TEXT_MUTED),
             ),
             Span::styled(
                 format!("{:.2}%", r.win_rate_pct),
-                Style::default().fg(Color::Green),
+                Style::default().fg(theme::SUCCESS),
             ),
-            Span::styled(" | Profit Factor: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" | Profit Factor: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("{:.2}", r.profit_factor),
-                Style::default().fg(Color::White),
+                Style::default().fg(theme::TEXT),
             ),
         ]));
     } else {
@@ -1245,14 +1286,11 @@ fn draw_backtest(frame: &mut Frame, area: Rect, app: &TuiApp) {
     frame.render_widget(p1, q1_area);
 
     // Q2: Top Right - Parameter Delta Comparison Table
-    let q2_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Parameter Delta (Default vs Tuned) ");
+    let q2_block = theme::panel_block("Parameter Delta (Default vs Tuned)", theme::ACCENT);
 
     let header2 = Row::new(vec!["Parameter", "Default", "Tuned Value", "Status"]).style(
         Style::default()
-            .fg(Color::Cyan)
+            .fg(theme::PRIMARY)
             .add_modifier(Modifier::BOLD),
     );
     let mut rows2 = Vec::new();
@@ -1262,10 +1300,10 @@ fn draw_backtest(frame: &mut Frame, area: Rect, app: &TuiApp) {
             let is_diff = v_tuned != &v_def;
             let val_style = if is_diff {
                 Style::default()
-                    .fg(Color::Green)
+                    .fg(theme::SUCCESS)
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(theme::TEXT)
             };
             rows2.push(
                 Row::new(vec![
@@ -1292,100 +1330,97 @@ fn draw_backtest(frame: &mut Frame, area: Rect, app: &TuiApp) {
     frame.render_widget(t2, q2_area);
 
     // Q3: Bottom Left - ASCII / Braille Equity Curve & Drawdown Chart (Sparkline)
-    let q3_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Analytical Equity Curve (Sparkline) ");
+    let q3_block = theme::panel_block("Analytical Equity Curve (Sparkline)", theme::ACCENT);
 
     let sparkline_data = &app.backtest_equity_curve;
     let sparkline = Sparkline::default()
         .block(q3_block)
-        .style(Style::default().fg(Color::Green))
+        .style(Style::default().fg(theme::PRIMARY))
         .data(sparkline_data);
     frame.render_widget(sparkline, q3_area);
 
     // Q4: Bottom Right - Optimal Trade Suggestion Card
-    let q4_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan))
-        .title(" Optimal Trade Suggestion ");
+    let q4_block = theme::panel_block("Optimal Trade Suggestion", theme::ACCENT);
 
     let mut sugg_lines = Vec::new();
     if let Some(ref s) = app.trade_suggestion {
         sugg_lines.push(Line::from(vec![
-            Span::styled("Asset: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Asset: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 &s.symbol,
                 Style::default()
-                    .fg(Color::White)
+                    .fg(theme::TEXT)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" | Bias: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" | Bias: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 s.signal.bias.as_str(),
                 Style::default()
-                    .fg(Color::Green)
+                    .fg(theme::SUCCESS)
                     .add_modifier(Modifier::BOLD),
             ),
         ]));
         sugg_lines.push(Line::from(vec![
-            Span::styled("Trigger: ", Style::default().fg(Color::DarkGray)),
-            Span::styled(&s.signal.reason, Style::default().fg(Color::Yellow)),
+            Span::styled("Trigger: ", Style::default().fg(theme::TEXT_MUTED)),
+            Span::styled(&s.signal.reason, Style::default().fg(theme::WARNING)),
         ]));
         sugg_lines.push(Line::from(vec![
-            Span::styled("Entry: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Entry: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("₹{:.2}", s.signal.entry_price),
                 Style::default()
-                    .fg(Color::White)
+                    .fg(theme::TEXT)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" | Stop Loss: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" | Stop Loss: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("₹{:.2}", s.signal.stop_loss),
-                Style::default().fg(Color::Red),
+                Style::default().fg(theme::ERROR),
             ),
         ]));
         sugg_lines.push(Line::from(vec![
-            Span::styled("Target 1 (1:2): ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Target 1 (1:2): ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("₹{:.2}", s.signal.target_1),
-                Style::default().fg(Color::Green),
+                Style::default().fg(theme::SUCCESS),
             ),
-            Span::styled(" | Target 2 (1:3): ", Style::default().fg(Color::DarkGray)),
+            Span::styled(
+                " | Target 2 (1:3): ",
+                Style::default().fg(theme::TEXT_MUTED),
+            ),
             Span::styled(
                 format!("₹{:.2}", s.signal.target_2),
-                Style::default().fg(Color::Green),
+                Style::default().fg(theme::SUCCESS),
             ),
         ]));
         sugg_lines.push(Line::from(vec![
-            Span::styled("Sized Qty: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Sized Qty: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("{} units", s.sizing.quantity),
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme::PRIMARY)
                     .add_modifier(Modifier::BOLD),
             ),
-            Span::styled(" | Margin: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" | Margin: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!(
                     "₹{:.2} ({:.1}%)",
                     s.sizing.notional_value, s.sizing.margin_utilization_pct
                 ),
-                Style::default().fg(Color::White),
+                Style::default().fg(theme::TEXT),
             ),
         ]));
         sugg_lines.push(Line::from(vec![
-            Span::styled("Friction Fee: ", Style::default().fg(Color::DarkGray)),
+            Span::styled("Friction Fee: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("₹{:.2}", s.statutory_charges.total_charges),
-                Style::default().fg(Color::DarkGray),
+                Style::default().fg(theme::TEXT_MUTED),
             ),
-            Span::styled(" | Net R:R: ", Style::default().fg(Color::DarkGray)),
+            Span::styled(" | Net R:R: ", Style::default().fg(theme::TEXT_MUTED)),
             Span::styled(
                 format!("1 : {:.2}", s.statutory_charges.net_risk_reward_ratio),
                 Style::default()
-                    .fg(Color::LightGreen)
+                    .fg(theme::SUCCESS)
                     .add_modifier(Modifier::BOLD),
             ),
         ]));

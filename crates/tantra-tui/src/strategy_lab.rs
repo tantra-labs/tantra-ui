@@ -11,13 +11,14 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::symbols::Marker;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::canvas::{Canvas, Line as CanvasLine, Rectangle};
-use ratatui::widgets::{Block, Borders, Paragraph, Row, Sparkline, Table, Wrap};
+use ratatui::widgets::{Paragraph, Row, Sparkline, Table, Wrap};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use tantra_ui_charts::scene::HintSeverity;
 use tantra_ui_core::{CanvasStrokeKind, CanvasTone, StrategyLoopViewModel, format_signed_r};
 
 use crate::app::{StrategyLabDetailView, TuiApp};
+use crate::theme;
 
 /// Convert an exact `Decimal` solely at the final `ratatui::widgets::canvas::Canvas`
 /// coordinate boundary. All domain state remains pure `Decimal`.
@@ -27,13 +28,13 @@ fn coord_f64(value: Decimal) -> f64 {
 
 fn tone_to_color(tone: CanvasTone) -> Color {
     match tone {
-        CanvasTone::Positive => Color::Green,
-        CanvasTone::Negative => Color::Red,
-        CanvasTone::Accent => Color::Cyan,
-        CanvasTone::Warning => Color::Yellow,
-        CanvasTone::Critical => Color::LightRed,
-        CanvasTone::Neutral => Color::White,
-        CanvasTone::Muted => Color::DarkGray,
+        CanvasTone::Positive => theme::SUCCESS,
+        CanvasTone::Negative => theme::ERROR,
+        CanvasTone::Accent => theme::ACCENT,
+        CanvasTone::Warning => theme::WARNING,
+        CanvasTone::Critical => theme::ERROR,
+        CanvasTone::Neutral => theme::TEXT,
+        CanvasTone::Muted => theme::TEXT_MUTED,
     }
 }
 
@@ -56,6 +57,7 @@ pub fn draw_strategy_lab(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let middle = Layout::default()
         .direction(Direction::Horizontal)
+        .spacing(1)
         .constraints([Constraint::Percentage(68), Constraint::Percentage(32)])
         .split(outer[1]);
 
@@ -81,14 +83,14 @@ fn draw_hud_and_layers(
         Span::styled(
             format!(" {} ", vm.config.strategy_id),
             Style::default()
-                .fg(Color::Black)
-                .bg(Color::Cyan)
+                .fg(theme::BACKGROUND)
+                .bg(theme::PRIMARY)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             format!(" {} ({}) ", vm.config.symbol, vm.config.timeframe),
             Style::default()
-                .fg(Color::White)
+                .fg(theme::TEXT)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
@@ -102,15 +104,15 @@ fn draw_hud_and_layers(
                 vm.false_sweep_rate_pct.round_dp(1),
                 view_tag,
             ),
-            Style::default().fg(Color::Yellow),
+            Style::default().fg(theme::WARNING),
         ),
     ];
 
     if let Some(ref d) = vm.delta_summary {
         let delta_color = if d.avg_r_delta >= Decimal::ZERO {
-            Color::Green
+            theme::SUCCESS
         } else {
-            Color::Red
+            theme::ERROR
         };
         header_spans.push(Span::styled(
             format!("ΔR {} ", format_signed_r(d.avg_r_delta)),
@@ -122,24 +124,24 @@ fn draw_hud_and_layers(
 
     header_spans.push(Span::styled(
         format!("[{}]", vm.data_source),
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(theme::TEXT_MUTED),
     ));
 
     let mut layer_spans = vec![Span::styled(
         " Layers: ",
         Style::default()
-            .fg(Color::DarkGray)
+            .fg(theme::TEXT_MUTED)
             .add_modifier(Modifier::BOLD),
     )];
     for pill in &vm.projected.layer_pills {
         let state_dot = if pill.active { "●" } else { "○" };
         let style = if pill.active {
             Style::default()
-                .fg(Color::Black)
-                .bg(Color::Green)
+                .fg(theme::BACKGROUND)
+                .bg(theme::SUCCESS)
                 .add_modifier(Modifier::BOLD)
         } else {
-            Style::default().fg(Color::DarkGray)
+            Style::default().fg(theme::TEXT_MUTED)
         };
         layer_spans.push(Span::styled(
             format!(
@@ -177,16 +179,16 @@ fn draw_price_canvas(
     selected_hint_index: usize,
 ) {
     let proj = &vm.projected;
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan))
-        .title(format!(
-            " Canvas: {} ({}) | y: {:.0}..{:.0} ",
+    let block = theme::panel_block(
+        &format!(
+            "Canvas: {} ({}) | y: {:.0}..{:.0}",
             vm.config.symbol,
             vm.config.timeframe,
             coord_f64(proj.y_min),
             coord_f64(proj.y_max),
-        ));
+        ),
+        theme::PRIMARY,
+    );
 
     let x_min = coord_f64(proj.x_min);
     let x_max = coord_f64(proj.x_max);
@@ -209,9 +211,9 @@ fn draw_price_canvas(
                 let color = if band.label.as_deref().unwrap_or("").starts_with('R')
                     || band.label.as_deref() == Some("OR_HIGH")
                 {
-                    Color::LightRed
+                    theme::ERROR
                 } else {
-                    Color::LightGreen
+                    theme::SUCCESS
                 };
                 ctx.draw(&Rectangle {
                     x: bx0,
@@ -255,7 +257,7 @@ fn draw_price_canvas(
                         y1: coord_f64(y0),
                         x2: coord_f64(x1),
                         y2: coord_f64(y1),
-                        color: Color::Cyan,
+                        color: theme::PRIMARY,
                     });
                 }
             }
@@ -266,9 +268,9 @@ fn draw_price_canvas(
             for c in &proj.candles {
                 let x = c.index as f64;
                 let color = if c.is_bullish {
-                    Color::Green
+                    theme::SUCCESS
                 } else {
-                    Color::Red
+                    theme::ERROR
                 };
                 ctx.draw(&CanvasLine {
                     x1: x,
@@ -379,8 +381,8 @@ fn draw_price_canvas(
                 };
                 let style = if is_selected {
                     Style::default()
-                        .fg(Color::Black)
-                        .bg(Color::Yellow)
+                        .fg(theme::BACKGROUND)
+                        .bg(theme::WARNING)
                         .add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(tone_to_color(h.tone))
@@ -404,13 +406,10 @@ fn draw_subpane_indicators(frame: &mut Frame, area: Rect, vm: &StrategyLoopViewM
         } else {
             "No sub-pane indicator series populated."
         };
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::DarkGray))
-            .title(" Sub-Pane Indicators (Sparkline) ");
+        let block = theme::panel_block("Sub-Pane Indicators (Sparkline)", theme::ACCENT);
         frame.render_widget(
             Paragraph::new(msg)
-                .style(Style::default().fg(Color::DarkGray))
+                .style(Style::default().fg(theme::TEXT_MUTED))
                 .block(block),
             area,
         );
@@ -434,17 +433,15 @@ fn draw_subpane_indicators(frame: &mut Frame, area: Rect, vm: &StrategyLoopViewM
             .map(|v| v.round_dp(2).to_string())
             .unwrap_or_else(|| "-".to_string());
         let color = if tr.name.to_uppercase().contains("RSI") {
-            Color::Magenta
+            theme::INFO
         } else {
-            Color::Cyan
+            theme::PRIMARY
         };
         let spark = Sparkline::default()
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Style::default().fg(Color::DarkGray))
-                    .title(format!(" {}: {} ", tr.name, latest_str)),
-            )
+            .block(theme::panel_block(
+                &format!("{}: {}", tr.name, latest_str),
+                theme::ACCENT,
+            ))
             .style(Style::default().fg(color))
             .max(100)
             .data(&tr.sparkline_bins);
@@ -466,30 +463,27 @@ fn draw_inspector_sidebar(
     // Top: Cursor-Steppable Hint Inspector
     let total_hints = vm.hints.len();
     let title = if total_hints == 0 {
-        " Hint Inspector (0/0) ".to_string()
+        "Hint Inspector (0/0)".to_string()
     } else {
         format!(
-            " Hint Inspector [←/→ p/n] ({}/{total_hints}) ",
+            "Hint Inspector [←/→ p/n] ({}/{total_hints})",
             selected_hint_index.min(total_hints - 1) + 1
         )
     };
-    let hint_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Yellow))
-        .title(title);
+    let hint_block = theme::panel_block(&title, theme::ACCENT);
 
     let mut lines = Vec::new();
     if !vm.scene.layers.hints {
         lines.push(Line::from(Span::styled(
             "Hints layer hidden — press [5] to show pins.",
-            Style::default().fg(Color::DarkGray),
+            Style::default().fg(theme::TEXT_MUTED),
         )));
     } else if let Some(h) = vm.hints.get(selected_hint_index) {
         let (sev_tag, sev_color) = match h.severity {
-            HintSeverity::Positive => ("[POSITIVE]", Color::Green),
-            HintSeverity::Warning => ("[WARNING]", Color::Yellow),
-            HintSeverity::Critical => ("[CRITICAL]", Color::Red),
-            HintSeverity::Info => ("[INFO]", Color::Cyan),
+            HintSeverity::Positive => ("[POSITIVE]", theme::SUCCESS),
+            HintSeverity::Warning => ("[WARNING]", theme::WARNING),
+            HintSeverity::Critical => ("[CRITICAL]", theme::ERROR),
+            HintSeverity::Info => ("[INFO]", theme::PRIMARY),
         };
         lines.push(Line::from(vec![
             Span::styled(
@@ -499,7 +493,7 @@ fn draw_inspector_sidebar(
             Span::styled(
                 format!("Bar #{} @ ₹{}", h.bar_index, h.price.round_dp(2)),
                 Style::default()
-                    .fg(Color::White)
+                    .fg(theme::TEXT)
                     .add_modifier(Modifier::BOLD),
             ),
         ]));
@@ -514,9 +508,9 @@ fn draw_inspector_sidebar(
                 lines.push(Line::from(vec![
                     Span::styled(
                         format!(" • {}: ", m.key),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(theme::TEXT_MUTED),
                     ),
-                    Span::styled(m.value.clone(), Style::default().fg(Color::Cyan)),
+                    Span::styled(m.value.clone(), Style::default().fg(theme::PRIMARY)),
                 ]));
             }
         }
@@ -533,25 +527,25 @@ fn draw_inspector_sidebar(
 
     // Bottom: Penetration Beyond Outer Edge Histogram
     let pen = &vm.penetration;
-    let pen_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(format!(
-            " Excursion >Outer ({} setups | {}% rec) ",
+    let pen_block = theme::panel_block(
+        &format!(
+            "Excursion >Outer ({} setups | {}% rec)",
             pen.sample_count, pen.pct_recovering_after_outer_touch
-        ));
+        ),
+        theme::ACCENT,
+    );
     let mut pen_lines = Vec::new();
     for b in &pen.buckets {
         pen_lines.push(Line::from(vec![
             Span::styled(
                 format!(" {:<4}", b.percentile),
-                Style::default().fg(Color::Cyan),
+                Style::default().fg(theme::PRIMARY),
             ),
             Span::styled(
                 format!("{:>4}x ", b.atr_value.round_dp(2)),
-                Style::default().fg(Color::White),
+                Style::default().fg(theme::TEXT),
             ),
-            Span::styled(b.bar_ascii.clone(), Style::default().fg(Color::Yellow)),
+            Span::styled(b.bar_ascii.clone(), Style::default().fg(theme::WARNING)),
         ]));
     }
     frame.render_widget(Paragraph::new(pen_lines).block(pen_block), split[1]);
@@ -565,20 +559,17 @@ fn draw_detail_panel(
 ) {
     match detail_view {
         StrategyLabDetailView::Benchmark => {
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Cyan))
-                .title(format!(
-                    " 4-Policy Stop Benchmark [m: Next] — {} ",
-                    vm.verdict_summary
-                ));
+            let block = theme::panel_block(
+                &format!("4-Policy Stop Benchmark [m: Next] — {}", vm.verdict_summary),
+                theme::ACCENT,
+            );
             let header = Row::new(vec![
                 "Policy", "Buf", "Trades", "Win%", "StopOut%", "Trap%", "NetAvgR", "PF", "Sharpe",
                 "MaxDD",
             ])
             .style(
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme::PRIMARY)
                     .add_modifier(Modifier::BOLD),
             );
             let rows: Vec<Row> = vm
@@ -588,10 +579,10 @@ fn draw_detail_panel(
                     let prefix = if r.is_recommended { "★ " } else { "  " };
                     let style = if r.is_recommended {
                         Style::default()
-                            .fg(Color::Green)
+                            .fg(theme::SUCCESS)
                             .add_modifier(Modifier::BOLD)
                     } else {
-                        Style::default().fg(Color::White)
+                        Style::default().fg(theme::TEXT)
                     };
                     Row::new(vec![
                         format!("{prefix}{}", r.label),
@@ -624,17 +615,17 @@ fn draw_detail_panel(
             frame.render_widget(table, area);
         }
         StrategyLabDetailView::Sweep => {
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Magenta))
-                .title(" Parameter Sweep Leaderboard (IS 70% / OOS 30% + WFE + DSR) [m: Next] ");
+            let block = theme::panel_block(
+                "Parameter Sweep Leaderboard (IS 70% / OOS 30% + WFE + DSR) [m: Next]",
+                theme::ACCENT,
+            );
             let header = Row::new(vec![
                 "Rank", "Cand", "Buf", "Horiz", "TgtR", "IS Shrp", "OOS Shrp", "OOS AvgR", "WFE%",
                 "DSR", "Δ Base",
             ])
             .style(
                 Style::default()
-                    .fg(Color::Cyan)
+                    .fg(theme::PRIMARY)
                     .add_modifier(Modifier::BOLD),
             );
             let rows: Vec<Row> = vm
@@ -643,10 +634,10 @@ fn draw_detail_panel(
                 .map(|r| {
                     let style = if r.is_winner {
                         Style::default()
-                            .fg(Color::Green)
+                            .fg(theme::SUCCESS)
                             .add_modifier(Modifier::BOLD)
                     } else {
-                        Style::default().fg(Color::White)
+                        Style::default().fg(theme::TEXT)
                     };
                     Row::new(vec![
                         if r.is_winner {
@@ -686,13 +677,13 @@ fn draw_detail_panel(
         }
         StrategyLabDetailView::Hedges => {
             let hc = &vm.hedge_card;
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Green))
-                .title(format!(
-                    " Expiry Hedge Card [x: Cycle Horizon | m: Next] — {} | {} ({}) ",
+            let block = theme::panel_block(
+                &format!(
+                    "Expiry Hedge Card [x: Cycle Horizon | m: Next] — {} | {} ({})",
                     hc.horizon, hc.structure, hc.chain_status
-                ));
+                ),
+                theme::ACCENT,
+            );
             let mut lines = Vec::new();
             for leg in &hc.legs {
                 lines.push(Line::from(vec![
@@ -700,15 +691,15 @@ fn draw_detail_panel(
                         format!("  {:<4} {:<3} ", leg.side, leg.option_type),
                         Style::default()
                             .fg(if leg.side == "BUY" {
-                                Color::Cyan
+                                theme::PRIMARY
                             } else {
-                                Color::Yellow
+                                theme::WARNING
                             })
                             .add_modifier(Modifier::BOLD),
                     ),
                     Span::styled(
                         format!("@ ₹{:<9} ", leg.strike.round_dp(2)),
-                        Style::default().fg(Color::White),
+                        Style::default().fg(theme::TEXT),
                     ),
                     Span::styled(
                         format!(
@@ -718,12 +709,12 @@ fn draw_detail_panel(
                             leg.expiry.as_deref().unwrap_or("nearest"),
                             leg.quote_source
                         ),
-                        Style::default().fg(Color::DarkGray),
+                        Style::default().fg(theme::TEXT_MUTED),
                     ),
                 ]));
             }
             lines.push(Line::from(vec![
-                Span::styled("  Risk: ", Style::default().fg(Color::DarkGray)),
+                Span::styled("  Risk: ", Style::default().fg(theme::TEXT_MUTED)),
                 Span::styled(
                     format!(
                         "MaxLoss ₹{} ({}% cap) | P95 Stress ₹{} | Net Cr/Dr ₹{} | Friction ₹{}",
@@ -733,12 +724,12 @@ fn draw_detail_panel(
                         hc.net_credit_or_debit.round_dp(2),
                         hc.estimated_friction_inr.round_dp(2),
                     ),
-                    Style::default().fg(Color::Yellow),
+                    Style::default().fg(theme::WARNING),
                 ),
             ]));
             lines.push(Line::from(vec![
-                Span::styled("  Why:  ", Style::default().fg(Color::DarkGray)),
-                Span::styled(hc.rationale.clone(), Style::default().fg(Color::Green)),
+                Span::styled("  Why:  ", Style::default().fg(theme::TEXT_MUTED)),
+                Span::styled(hc.rationale.clone(), Style::default().fg(theme::SUCCESS)),
             ]));
             frame.render_widget(
                 Paragraph::new(lines).block(block).wrap(Wrap { trim: true }),
@@ -758,63 +749,63 @@ fn draw_controls_legend(frame: &mut Frame, area: Rect, detail_view: StrategyLabD
         Span::styled(
             " [1-6] ",
             Style::default()
-                .fg(Color::Green)
+                .fg(theme::SUCCESS)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("Layers | "),
         Span::styled(
             "[+/-] ",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme::WARNING)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("SL Buf | "),
         Span::styled(
             "[s] ",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme::WARNING)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("Strat | "),
         Span::styled(
             "[a] ",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme::WARNING)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("Asset | "),
         Span::styled(
             "[t] ",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme::WARNING)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("TF | "),
         Span::styled(
             "[e] ",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme::WARNING)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("Entry | "),
         Span::styled(
             "[x] ",
             Style::default()
-                .fg(Color::Yellow)
+                .fg(theme::WARNING)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("Expiry | "),
         Span::styled(
             "[m] ",
             Style::default()
-                .fg(Color::Cyan)
+                .fg(theme::PRIMARY)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw(format!("{view_label} | ")),
         Span::styled(
             "[←/→ p/n] ",
             Style::default()
-                .fg(Color::Cyan)
+                .fg(theme::PRIMARY)
                 .add_modifier(Modifier::BOLD),
         ),
         Span::raw("Hint"),

@@ -3,10 +3,12 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Cell, Paragraph, Row, Table, Widget};
+use ratatui::widgets::{Cell, Paragraph, Row, Table, Widget};
 use tantra_agent_core::result::DisplayBlock;
+
+use crate::theme;
 
 /// Renders a single gateway [`DisplayBlock`] into a [`Rect`].
 pub struct ResultBlockWidget<'a> {
@@ -32,10 +34,10 @@ impl<'a> Widget for ResultBlockWidget<'a> {
                 .header(Row::new(columns.iter().map(|column| {
                     Cell::new(Line::from(Span::styled(
                         column.as_str(),
-                        Style::default().add_modifier(Modifier::BOLD),
+                        theme::bold(theme::ACCENT),
                     )))
                 })))
-                .block(Block::default().borders(Borders::ALL).title(title.as_str()));
+                .block(theme::panel_block(title.as_str(), theme::ACCENT));
                 Widget::render(table, area, buf);
             }
             DisplayBlock::MetricGrid { items } => {
@@ -43,22 +45,22 @@ impl<'a> Widget for ResultBlockWidget<'a> {
                     .iter()
                     .map(|item| Line::from(format!("{}: {}", item.label, item.value)))
                     .collect::<Vec<_>>();
-                let paragraph = Paragraph::new(lines).block(Block::default().borders(Borders::ALL));
+                let paragraph = Paragraph::new(lines).block(theme::field_block(false));
                 Widget::render(paragraph, area, buf);
             }
             DisplayBlock::Alert { level, message } => {
                 let upper = level.to_uppercase();
                 let color = match upper.as_str() {
-                    "INFO" => Color::Green,
-                    "WARN" => Color::Yellow,
-                    "CRITICAL" => Color::Red,
-                    _ => Color::White,
+                    "INFO" => theme::INFO,
+                    "WARN" => theme::WARNING,
+                    "CRITICAL" => theme::ERROR,
+                    _ => theme::TEXT,
                 };
                 let line = Line::from(vec![
                     Span::styled(format!("[{upper}]"), Style::default().fg(color)),
                     Span::raw(format!(" {message}")),
                 ]);
-                let paragraph = Paragraph::new(line).block(Block::default().borders(Borders::ALL));
+                let paragraph = Paragraph::new(line).block(theme::field_block(false));
                 Widget::render(paragraph, area, buf);
             }
             DisplayBlock::Chart {
@@ -69,7 +71,7 @@ impl<'a> Widget for ResultBlockWidget<'a> {
                 // Chart data lives in the gateway-side data store; render the
                 // reference honestly (plan 0003 Phase 1).
                 let line = Line::from(format!("{title} ({chart_type}) series {series_ref}"));
-                let paragraph = Paragraph::new(line).block(Block::default().borders(Borders::ALL));
+                let paragraph = Paragraph::new(line).block(theme::field_block(false));
                 Widget::render(paragraph, area, buf);
             }
             DisplayBlock::OverlayScene {
@@ -91,8 +93,8 @@ impl<'a> Widget for ResultBlockWidget<'a> {
                     count("hints"),
                     count("hedges"),
                 ));
-                let paragraph = Paragraph::new(line)
-                    .block(Block::default().borders(Borders::ALL).title(title.as_str()));
+                let paragraph =
+                    Paragraph::new(line).block(theme::panel_block(title.as_str(), theme::ACCENT));
                 Widget::render(paragraph, area, buf);
             }
         }
