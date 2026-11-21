@@ -50,6 +50,21 @@ pub fn render_blocks(blocks: &[DisplayBlock]) -> String {
                 scene,
                 ..
             } => out.push_str(&render_overlay_scene(title, symbol, timeframe, scene)),
+            DisplayBlock::View {
+                title,
+                summary,
+                highlights,
+                ..
+            } => {
+                out.push_str(&format!("## {title}\n"));
+                if !summary.is_empty() {
+                    out.push_str(summary);
+                    out.push('\n');
+                }
+                for h in highlights {
+                    out.push_str(&format!("{}: {}\n", h.label, h.value));
+                }
+            }
         }
         out.push('\n');
     }

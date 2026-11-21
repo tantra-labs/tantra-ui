@@ -345,6 +345,7 @@ fn tool_height(block: &DisplayBlock) -> u16 {
         DisplayBlock::Alert { .. } => 3,
         DisplayBlock::OverlayScene { .. } => 4,
         DisplayBlock::Chart { .. } => 4,
+        DisplayBlock::View { summary, .. } => summary.lines().count().min(8) + 3,
         #[allow(unreachable_patterns)]
         _ => 4,
     };
@@ -355,7 +356,8 @@ fn block_label(block: &DisplayBlock) -> String {
     match block {
         DisplayBlock::Table { title, .. }
         | DisplayBlock::Chart { title, .. }
-        | DisplayBlock::OverlayScene { title, .. } => title.clone(),
+        | DisplayBlock::OverlayScene { title, .. }
+        | DisplayBlock::View { title, .. } => title.clone(),
         DisplayBlock::MetricGrid { .. } => "metrics".to_string(),
         DisplayBlock::Alert { .. } => "alert".to_string(),
         #[allow(unreachable_patterns)]

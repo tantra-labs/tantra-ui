@@ -97,6 +97,20 @@ impl<'a> Widget for ResultBlockWidget<'a> {
                     Paragraph::new(line).block(theme::panel_block(title.as_str(), theme::ACCENT));
                 Widget::render(paragraph, area, buf);
             }
+            DisplayBlock::View {
+                kind,
+                title,
+                summary,
+                ..
+            } => {
+                // Minimal render; the real dynamic pane is built separately (agent plan 0020).
+                let mut lines = vec![Line::from(format!("{kind:?}"))];
+                lines.extend(summary.lines().map(|l| Line::from(l.to_string())));
+                let paragraph = Paragraph::new(lines)
+                    .wrap(ratatui::widgets::Wrap { trim: true })
+                    .block(theme::panel_block(title.as_str(), theme::ACCENT));
+                Widget::render(paragraph, area, buf);
+            }
         }
     }
 }
