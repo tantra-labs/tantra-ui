@@ -17,27 +17,31 @@ Trader and quantitative workstation interfaces across terminal and browser.
 - `tantra-cli` — Command line interface (`tantra` CLI) with one-shot ask & interactive chat
 - `tantra-highlight` — Zero-I/O WASM-safe syntax highlighter (hand-rolled lexer, no tree-sitter)
 
-## Local LLM / SmolLM2 Integration (CLI & TUI)
+## LLM provider config (CLI & TUI)
 
-`tantra-cli` and `tantra-tui` support pure Rust in-process GGUF inference (no external Python or daemon processes required) using Hugging Face Candle and `shimmytok`:
+`tantra ask`, `tantra chat` and `tantra tui` read their LLM providers from a `tantra.jsonc`
+(project file found by walking up from cwd, merged over `~/.config/tantra/tantra.jsonc`):
+
+```jsonc
+{
+  "model": "local/qwen3-30b-a3b",
+  "provider": {
+    "local": {
+      "options": { "baseURL": "http://127.0.0.1:8080/v1" },
+      "models": { "qwen3-30b-a3b": {} }
+    }
+  }
+}
+```
 
 ```bash
-# 1. Download SmolLM2-360M (default ~230MB) or 1.7B GGUF:
-./scripts/download-smollm.sh 360m
-
-# 2. Run one-shot CLI query:
-tantra ask "Explain VWAP vs TWAP" --model-path ./models/SmolLM2-360M-Instruct-Q4_K_M.gguf
-
-# 3. Interactive terminal chat REPL:
-tantra chat --model-path ./models/SmolLM2-360M-Instruct-Q4_K_M.gguf
-
-# 4. Interactive full-screen Ratatui terminal workstation (tab 2: AgentChat):
-tantra tui --model-path ./models/SmolLM2-360M-Instruct-Q4_K_M.gguf
-
-# Or configure via environment variable:
-export TANTRA_GGUF_PATH="./models/SmolLM2-360M-Instruct-Q4_K_M.gguf"
-tantra chat
+tantra ask "Explain VWAP vs TWAP"
+tantra chat --model local/qwen3-30b-a3b
+tantra tui --config ./tantra.jsonc
 ```
+
+`--model` takes a `provider/model` catalog id; `--config` points at an explicit file. See
+`tantra-agent/docs/design/provider-config.md` for the full schema.
 
 ## Build & Test
 

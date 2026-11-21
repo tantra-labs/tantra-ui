@@ -430,6 +430,8 @@ pub struct TuiApp {
     pub is_loading: bool,
     /// Active model name or persona.
     pub model_name: String,
+    /// The configured model (catalog id) that persona resets return to.
+    pub base_model_name: String,
     /// Prompt pending submission to agent.
     pub pending_prompt: Option<String>,
     /// Whether the command palette modal is open.
@@ -537,7 +539,8 @@ impl TuiApp {
             input_buffer: String::new(),
             is_input_mode: true,
             is_loading: false,
-            model_name: "Llama-3.2-3B-Instruct (Candle GGUF)".to_string(),
+            model_name: "unconfigured".to_string(),
+            base_model_name: "unconfigured".to_string(),
             pending_prompt: None,
             is_palette_open: false,
             palette_query: String::new(),
@@ -574,6 +577,7 @@ impl TuiApp {
     /// Set model name display.
     pub fn with_model_name(mut self, name: impl Into<String>) -> Self {
         self.model_name = name.into();
+        self.base_model_name = self.model_name.clone();
         self
     }
 
@@ -975,7 +979,7 @@ impl TuiApp {
             }
             "/agent" => match arg {
                 "off" | "default" => {
-                    self.model_name = "Llama-3.2-3B-Instruct (Candle GGUF)".to_string();
+                    self.model_name = self.base_model_name.clone();
                     self.chat.push(AgentMessage::new(
                         AgentRole::System,
                         "Reset active persona to base workstation assistant.",
@@ -1128,7 +1132,7 @@ impl TuiApp {
                 ));
             }
             "/unbind" => {
-                self.model_name = "Llama-3.2-3B-Instruct (Candle GGUF)".to_string();
+                self.model_name = self.base_model_name.clone();
                 self.chat.push(AgentMessage::new(
                     AgentRole::System,
                     "Unbound persona and model overrides. Reverted to default workstation configuration.",

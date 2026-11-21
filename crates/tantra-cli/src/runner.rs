@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use tantra_agent_llm::{
-    CandleGgufConfig, CandleGgufProvider, ChatMessage, ChatRequest, ChatStreamEvent, ENV_GGUF_PATH,
-    LlmProvider,
+    ChatMessage, ChatRequest, ChatStreamEvent, ConfigCatalog, ConfigError, LlmProvider,
+    ModelCatalog, ModelInfo, load_config,
 };
 use tantra_agent_mcp::McpServer;
 use tantra_agent_mcp::frontier::ManifestGenerator;
@@ -115,76 +115,58 @@ pub fn tantra_home_dir() -> PathBuf {
     }
 }
 
-fn find_existing_path(path: &Path) -> PathBuf {
-    if path.exists() {
-        return path.to_path_buf();
-    }
-    if path.is_relative() {
-        for parent in ["..", "../..", "../../.."] {
-            let candidate = Path::new(parent).join(path);
-            if candidate.exists() {
-                return candidate;
-            }
-        }
-    }
-    path.to_path_buf()
+/// A model resolved from the provider config file.
+pub struct ResolvedModel {
+    /// Catalog id (`provider/model`).
+    pub id: String,
+    /// Provider bound to the resolved model.
+    pub provider: Arc<dyn LlmProvider>,
+    /// Every model configured in the catalog.
+    pub models: Vec<ModelInfo>,
 }
 
-/// Resolve provider to use for the CLI command.
+/// Resolve the LLM provider from `tantra.jsonc` (or an explicit `--config`).
+///
+/// `Ok(None)` means no config file exists; invalid config or an unknown model
+/// id is an error.
 pub fn resolve_provider(
-    model_path: Option<&Path>,
-    temperature: Option<f64>,
-) -> Result<Option<Arc<dyn LlmProvider>>, CliError> {
-    // 1. Explicit model path passed on CLI
-    if let Some(path) = model_path {
-        let resolved = find_existing_path(path);
-        let mut config = CandleGgufConfig::new(resolved);
-        if let Some(t) = temperature {
-            config = config.with_temperature(t);
+    config: Option<&Path>,
+    model: Option<&str>,
+) -> Result<Option<ResolvedModel>, CliError> {
+    let loaded = match load_config(config) {
+        Ok(l) => l,
+        Err(ConfigError::NotFound { .. }) => return Ok(None),
+        Err(e) => {
+            return Err(CliError::Execution(format!(
+                "invalid LLM provider config: {e}"
+            )));
         }
-        return Ok(Some(Arc::new(CandleGgufProvider::new(config))));
-    }
-
-    // 2. Environment variable TANTRA_GGUF_PATH
-    if let Ok(env_path) = std::env::var(ENV_GGUF_PATH) {
-        if !env_path.trim().is_empty() {
-            let resolved = find_existing_path(Path::new(&env_path));
-            let mut config = CandleGgufConfig::new(resolved);
-            if let Some(t) = temperature {
-                config = config.with_temperature(t);
-            }
-            return Ok(Some(Arc::new(CandleGgufProvider::new(config))));
-        }
-    }
-
-    // 3. OpenAI-compatible endpoint from environment
-    if let Ok(provider) = tantra_agent_llm::openai_provider_from_env() {
-        return Ok(Some(Arc::new(provider)));
-    }
-
-    // 4. Default model file on disk
-    let candidates = [
-        "models/SmolLM2-360M-Instruct-Q4_K_M.gguf",
-        "models/smollm2-360m-instruct-q4_k_m.gguf",
-    ];
-    for c in candidates {
-        let resolved = find_existing_path(Path::new(c));
-        if resolved.exists() {
-            let mut config = CandleGgufConfig::new(resolved);
-            if let Some(t) = temperature {
-                config = config.with_temperature(t);
-            }
-            return Ok(Some(Arc::new(CandleGgufProvider::new(config))));
-        }
-    }
-
-    Ok(None)
+    };
+    let catalog = ConfigCatalog::build(&loaded, &|k| std::env::var(k).ok())
+        .map_err(|e| CliError::Execution(format!("invalid LLM provider config: {e}")))?;
+    let models = catalog.models();
+    let id = model
+        .map(str::to_string)
+        .unwrap_or_else(|| catalog.default_model());
+    let provider = catalog.provider(&id).map_err(|_| {
+        let list = models
+            .iter()
+            .map(|m| m.id.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        CliError::Execution(format!("unknown model '{id}' — configured: {list}"))
+    })?;
+    Ok(Some(ResolvedModel {
+        id,
+        provider,
+        models,
+    }))
 }
 
 /// Dispatch a parsed command using default provider resolution.
 pub fn run(cli: &CliArgs) -> Result<CommandOutcome, CliError> {
-    let provider = resolve_provider(cli.model_path.as_deref(), cli.temperature)?;
-    run_with_provider(cli, provider)
+    let resolved = resolve_provider(cli.config.as_deref(), cli.model.as_deref())?;
+    run_with_provider(cli, resolved.map(|r| r.provider))
 }
 
 /// Dispatch a parsed command with an explicitly supplied LLM provider.
@@ -270,7 +252,7 @@ fn run_ask(
         }
     }
 
-    let provider = provider.ok_or_else(|| CliError::NotWired("tantra ask".to_string()))?;
+    let provider = provider.ok_or_else(|| CliError::NotWired("no LLM configured — add a provider to tantra.jsonc (see tantra-agent/docs/design/provider-config.md) or pass --config".to_string()))?;
 
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -503,7 +485,7 @@ fn run_chat(
 ) -> Result<CommandOutcome, CliError> {
     let provider = provider.ok_or_else(|| {
         CliError::NotWired(
-            "tantra chat (no model found. Provide --model-path or TANTRA_GGUF_PATH)".to_string(),
+            "no LLM configured — add a provider to tantra.jsonc (see tantra-agent/docs/design/provider-config.md) or pass --config".to_string(),
         )
     })?;
 
@@ -1112,7 +1094,10 @@ const BUILTIN_PLUGINS: [(&str, &str); 4] = [
         "risk-sebi",
         "SEBI pre-trade risk surfaces (CI; no live engine in this CLI)",
     ),
-    ("candle-gguf", "Candle GGUF LLM inference for ask/chat"),
+    (
+        "llm-providers",
+        "OpenAI-compatible LLM providers from tantra.jsonc for ask/chat",
+    ),
     ("mcp-gateway", "MCP server management (tantra mcp)"),
 ];
 
@@ -1573,7 +1558,7 @@ fn run_doctor(args: &DoctorArgs) -> Result<CommandOutcome, CliError> {
 /// Runs a `tantra doctor` check against an explicit home directory.
 ///
 /// Real environment checks: home dir, `home/lakehouse`, `home/cache`, a
-/// discoverable GGUF model (`TANTRA_GGUF_PATH` or `models/*.gguf` in cwd), and
+/// loadable LLM provider config (`tantra.jsonc`, default model id), and
 /// `TANTRA_HOME`/`HOME` presence. `--fix` provisions the missing directories;
 /// `--json` emits the same real booleans as a structured object.
 pub fn run_doctor_with_home(home: &Path, args: &DoctorArgs) -> Result<CommandOutcome, CliError> {
@@ -1589,7 +1574,16 @@ pub fn run_doctor_with_home(home: &Path, args: &DoctorArgs) -> Result<CommandOut
     let home_ok = home.exists();
     let lakehouse_ok = lakehouse.exists();
     let cache_ok = cache.exists();
-    let model = discover_model_file();
+    let (llm_config, model) = match load_config(None) {
+        Ok(loaded) => {
+            let first = loaded.sources.first().map(|p| p.display().to_string());
+            let default = ConfigCatalog::build(&loaded, &|k| std::env::var(k).ok())
+                .ok()
+                .map(|c| c.default_model());
+            (first, default)
+        }
+        Err(_) => (None, None),
+    };
     let home_env_ok = std::env::var("TANTRA_HOME")
         .map(|h| !h.trim().is_empty())
         .unwrap_or(false)
@@ -1611,6 +1605,7 @@ pub fn run_doctor_with_home(home: &Path, args: &DoctorArgs) -> Result<CommandOut
             "lakehouse": lakehouse_ok,
             "cache": cache_ok,
             "model": model,
+            "llm_config": llm_config,
             "home_env": home_env_ok,
             "fixable": fixable,
         });
@@ -1634,6 +1629,15 @@ pub fn run_doctor_with_home(home: &Path, args: &DoctorArgs) -> Result<CommandOut
         if cache_ok { "OK" } else { "MISSING" },
     ));
     report.push_str(&format!(
+        "llm config    {}  [{}]\n",
+        llm_config.as_deref().unwrap_or("(none)"),
+        if llm_config.is_some() {
+            "OK"
+        } else {
+            "MISSING"
+        },
+    ));
+    report.push_str(&format!(
         "model         {}  [{}]\n",
         model.as_deref().unwrap_or("(none)"),
         if model.is_some() { "OK" } else { "MISSING" },
@@ -1644,26 +1648,6 @@ pub fn run_doctor_with_home(home: &Path, args: &DoctorArgs) -> Result<CommandOut
     ));
     report.push_str("Missing directories can be provisioned with `tantra doctor --fix`.");
     Ok(CommandOutcome::DoctorReport(report))
-}
-
-/// Discover a GGUF model file, mirroring `resolve_provider`'s lookup: the
-/// `TANTRA_GGUF_PATH` env var first, then `models/*.gguf` in the cwd.
-fn discover_model_file() -> Option<String> {
-    if let Ok(env_path) = std::env::var(ENV_GGUF_PATH) {
-        if !env_path.trim().is_empty() && Path::new(&env_path).exists() {
-            return Some(env_path);
-        }
-    }
-    let Ok(rd) = fs::read_dir("models") else {
-        return None;
-    };
-    for entry in rd.flatten() {
-        let p = entry.path();
-        if p.is_file() && p.extension().and_then(|e| e.to_str()) == Some("gguf") {
-            return Some(p.display().to_string());
-        }
-    }
-    None
 }
 
 fn run_purge(args: &PurgeArgs) -> Result<CommandOutcome, CliError> {
@@ -1742,7 +1726,7 @@ pub fn run_health_with_home(home: &Path) -> Result<CommandOutcome, CliError> {
         "tantra: healthy\n\
          home      {home_disp}\n\
          tui       ready (ratatui 7-tab workstation)\n\
-         ask/chat  wired (Candle GGUF / OpenAI-compatible endpoints)\n\
+         ask/chat  wired (OpenAI-compatible providers from tantra.jsonc)\n\
          scan      wired (canonical screener evaluator; live `tantra scan --server <url>`)\n\
          serve     wired (tantra-runtime-api-rest, incl. GET /screener/scan)\n\
          jobs      wired (FileJobRegistry + journal)\n\

@@ -2,9 +2,7 @@
 
 use std::io::IsTerminal;
 use std::process::ExitCode;
-use std::sync::Arc;
 
-use tantra_agent_llm::{CandleGgufConfig, CandleGgufProvider};
 use tantra_cli::args::parse;
 use tantra_cli::jobs_runtime::boot_recover;
 use tantra_cli::runner::{CliError, CommandOutcome, resolve_provider, run, tantra_home_dir};
@@ -27,14 +25,25 @@ fn main() -> ExitCode {
                         return ExitCode::SUCCESS;
                     }
 
-                    let provider = resolve_provider(cli.model_path.as_deref(), cli.temperature)
-                        .ok()
-                        .flatten()
-                        .unwrap_or_else(|| {
-                            Arc::new(CandleGgufProvider::new(CandleGgufConfig::default()))
-                        });
+                    let resolved = match resolve_provider(
+                        cli.config.as_deref(),
+                        cli.model.as_deref(),
+                    ) {
+                        Ok(Some(r)) => r,
+                        Ok(None) => {
+                            eprintln!(
+                                "tantra: no LLM configured — create tantra.jsonc (see tantra-agent/docs/design/provider-config.md) or pass --config <path>"
+                            );
+                            return ExitCode::from(2);
+                        }
+                        Err(e) => {
+                            eprintln!("tantra: {e}");
+                            return ExitCode::from(2);
+                        }
+                    };
+                    let provider = resolved.provider;
 
-                    let mut app = TuiApp::new().with_model_name(provider.model_name());
+                    let mut app = TuiApp::new().with_model_name(resolved.id.clone());
                     if cli.skip_permissions {
                         app.auto_approve = true;
                     }

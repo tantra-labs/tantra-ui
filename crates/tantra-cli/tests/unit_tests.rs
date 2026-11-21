@@ -27,7 +27,8 @@ fn parse_cli_roundtrip_tui() {
     };
     let args: CliArgs = cli.into();
     assert_eq!(args.command, Command::Tui { message: None });
-    assert_eq!(args.model_path, None);
+    assert_eq!(args.model, None);
+    assert_eq!(args.config, None);
 }
 
 #[test]
@@ -216,7 +217,10 @@ fn run_ask_fails_with_not_wired_without_provider() {
     };
     assert_eq!(
         run_with_provider(&cli, None),
-        Err(CliError::NotWired("tantra ask".into()))
+        Err(CliError::NotWired(
+            "no LLM configured — add a provider to tantra.jsonc (see tantra-agent/docs/design/provider-config.md) or pass --config"
+                .into()
+        ))
     );
 }
 

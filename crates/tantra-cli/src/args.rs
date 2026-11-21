@@ -505,7 +505,8 @@ pub struct CliArgs {
     /// The command to run.
     pub command: Command,
     /// Optional path to a local GGUF model file.
-    pub model_path: Option<PathBuf>,
+    pub model: Option<String>,
+    pub config: Option<PathBuf>,
     /// Sampling temperature (0.0 to 1.0).
     pub temperature: Option<f64>,
     /// Effective resolved log level.
@@ -528,7 +529,8 @@ impl Default for CliArgs {
     fn default() -> Self {
         Self {
             command: Command::Tui { message: None },
-            model_path: None,
+            model: None,
+            config: None,
             temperature: None,
             log_level: LogLevel::Info,
             verbose: false,
@@ -591,8 +593,10 @@ pub struct Cli {
     pub message: Option<String>,
 
     /// Optional path to a local GGUF model file (SmolLM2, etc.).
-    #[arg(short = 'm', long = "model-path", global = true)]
-    pub model_path: Option<PathBuf>,
+    #[arg(short = 'm', long = "model", global = true)]
+    pub model: Option<String>,
+    #[arg(long = "config", global = true)]
+    pub config: Option<PathBuf>,
 
     /// Sampling temperature (0.0 to 1.0).
     #[arg(short = 't', long = "temperature", global = true)]
@@ -635,7 +639,8 @@ impl Default for Cli {
     fn default() -> Self {
         Self {
             message: None,
-            model_path: None,
+            model: None,
+            config: None,
             temperature: None,
             log_level: None,
             verbose: false,
@@ -1316,7 +1321,8 @@ impl From<Cli> for CliArgs {
 
         Self {
             command,
-            model_path: cli.model_path,
+            model: cli.model,
+            config: cli.config,
             temperature: cli.temperature,
             log_level,
             verbose: cli.verbose,
