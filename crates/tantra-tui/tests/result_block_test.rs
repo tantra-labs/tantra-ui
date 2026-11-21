@@ -49,3 +49,35 @@ fn result_block_widget_renders_alert() {
         "missing message in: {text}"
     );
 }
+
+#[test]
+fn result_block_widget_summarises_overlay_scene() {
+    let block = DisplayBlock::OverlayScene {
+        title: "EE+ on NIFTY".into(),
+        symbol: "NSE:NIFTY50-INDEX".into(),
+        timeframe: "1d".into(),
+        scene: serde_json::json!({
+            "signals": [{}, {}], "bands": [{}], "stops": [], "indicators": [], "hints": [{}], "hedges": []
+        }),
+        time_axis: vec![],
+    };
+    let backend = TestBackend::new(120, 6);
+    let mut terminal = Terminal::new(backend).expect("terminal");
+    terminal
+        .draw(|frame| {
+            frame.render_widget(ResultBlockWidget { block: &block }, frame.area());
+        })
+        .expect("draw");
+    let text: String = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|c| c.symbol())
+        .collect();
+    assert!(
+        text.contains("2 signals, 1 bands"),
+        "missing counts in: {text}"
+    );
+    assert!(text.contains("EE+ on NIFTY"), "missing title in: {text}");
+}

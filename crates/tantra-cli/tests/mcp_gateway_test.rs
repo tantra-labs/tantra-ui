@@ -135,3 +135,20 @@ fn mcp_config_unknown_client_errors() {
         Ok(_) => panic!("expected an error for unknown MCP client"),
     }
 }
+
+#[test]
+fn render_blocks_summarises_overlay_scene() {
+    let blocks = vec![DisplayBlock::OverlayScene {
+        title: "ORB-15".into(),
+        symbol: "NSE:RELIANCE".into(),
+        timeframe: "5m".into(),
+        scene: serde_json::json!({"signals": [{}], "bands": [], "stops": [{}, {}], "indicators": [], "hints": [], "hedges": []}),
+        time_axis: vec![1, 2],
+    }];
+    let out = render_blocks(&blocks);
+    assert!(out.contains("ORB-15 [NSE:RELIANCE 5m]"), "{out}");
+    assert!(
+        out.contains("signals=1") && out.contains("stops=2"),
+        "{out}"
+    );
+}

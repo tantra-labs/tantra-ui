@@ -43,6 +43,13 @@ pub fn render_blocks(blocks: &[DisplayBlock]) -> String {
                 series_ref,
             } => out.push_str(&render_chart(title, chart_type, series_ref)),
             DisplayBlock::Alert { level, message } => out.push_str(&render_alert(level, message)),
+            DisplayBlock::OverlayScene {
+                title,
+                symbol,
+                timeframe,
+                scene,
+                ..
+            } => out.push_str(&render_overlay_scene(title, symbol, timeframe, scene)),
         }
         out.push('\n');
     }
@@ -141,6 +148,32 @@ fn render_chart(title: &str, chart_type: &str, series_ref: &str) -> String {
     // DataReferenceStore); CLI renders the reference honestly — plan 0003
     // Phase 1.
     format!("📈 {title} ({chart_type}) — series {series_ref}\n")
+}
+
+/// Count of one scene layer array (`signals`, `bands`, ...); 0 when absent.
+fn scene_layer_len(scene: &serde_json::Value, key: &str) -> usize {
+    scene
+        .get(key)
+        .and_then(|v| v.as_array())
+        .map_or(0, Vec::len)
+}
+
+/// An agent-packaged chart scene: the CLI has no chart surface, so it prints the
+/// layer counts and points the user at `--export-scene` / the TUI Strategy Lab.
+fn render_overlay_scene(
+    title: &str,
+    symbol: &str,
+    timeframe: &str,
+    scene: &serde_json::Value,
+) -> String {
+    let counts = ["signals", "bands", "stops", "indicators", "hints", "hedges"]
+        .iter()
+        .map(|k| format!("{k}={}", scene_layer_len(scene, k)))
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!(
+        "{BOLD}Scene{RESET} {title} [{symbol} {timeframe}] {counts}\n  (render in the TUI Strategy Lab or the web chart)\n"
+    )
 }
 
 fn render_alert(level: &str, message: &str) -> String {

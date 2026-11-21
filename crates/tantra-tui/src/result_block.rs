@@ -72,6 +72,29 @@ impl<'a> Widget for ResultBlockWidget<'a> {
                 let paragraph = Paragraph::new(line).block(Block::default().borders(Borders::ALL));
                 Widget::render(paragraph, area, buf);
             }
+            DisplayBlock::OverlayScene {
+                title,
+                symbol,
+                timeframe,
+                scene,
+                ..
+            } => {
+                // Agent-packaged chart scene (`chart_scene_annotate`): summarise its layers
+                // here; the full scene renders in the Strategy Lab chart.
+                let count = |k: &str| scene.get(k).and_then(|v| v.as_array()).map_or(0, Vec::len);
+                let line = Line::from(format!(
+                    "{symbol} {timeframe}: {} signals, {} bands, {} stops, {} indicators, {} hints, {} hedges",
+                    count("signals"),
+                    count("bands"),
+                    count("stops"),
+                    count("indicators"),
+                    count("hints"),
+                    count("hedges"),
+                ));
+                let paragraph = Paragraph::new(line)
+                    .block(Block::default().borders(Borders::ALL).title(title.as_str()));
+                Widget::render(paragraph, area, buf);
+            }
         }
     }
 }
