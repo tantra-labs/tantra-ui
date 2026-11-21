@@ -79,6 +79,31 @@ fn markdown_lines(msg: &AgentMessage) -> Vec<Vec<Span<'static>>> {
     lines
 }
 
+fn tool_row_line(row: &crate::agent_chat::ToolRow, tick: u64) -> Line<'static> {
+    use crate::agent_chat::ToolStatus;
+    let muted = theme::fg(theme::TEXT_MUTED);
+    let marker = match row.status {
+        ToolStatus::Running => Span::styled(
+            format!("{} ", theme::spinner_frame(tick)),
+            theme::fg(theme::ACCENT),
+        ),
+        ToolStatus::Ok => Span::styled("✓ ", theme::fg(theme::SUCCESS)),
+        ToolStatus::Error => Span::styled("✗ ", theme::fg(theme::ERROR)),
+    };
+    let mut spans = vec![
+        marker,
+        Span::styled(format!("{} ", row.name.replace('_', " ")), muted),
+        Span::styled(truncate(&row.summary, 56), muted),
+    ];
+    if let Some(ms) = row.elapsed_ms {
+        spans.push(Span::styled(
+            format!(" ({}.{}s)", ms / 1000, (ms % 1000) / 100),
+            muted,
+        ));
+    }
+    Line::from(spans)
+}
+
 fn message_lines(msg: &AgentMessage, tick: u64, loading: bool) -> Vec<Line<'static>> {
     match msg.role {
         AgentRole::User => msg
@@ -92,6 +117,11 @@ fn message_lines(msg: &AgentMessage, tick: u64, loading: bool) -> Vec<Line<'stat
                     Span::styled(l.to_string(), theme::bold(theme::TEXT)),
                 ])
             })
+            .collect(),
+        AgentRole::Tool if msg.tool.is_some() => msg
+            .tool
+            .iter()
+            .map(|row| tool_row_line(row, tick))
             .collect(),
         AgentRole::System | AgentRole::Tool => msg
             .text
@@ -229,7 +259,21 @@ fn draw_workspace(frame: &mut Frame, area: Rect, app: &TuiApp) {
     } else {
         "press i to ask, / for commands"
     };
-    let comp_h = composer_rows(app, placeholder, area.width);
+    let split = app.active_tab == ActiveTab::AgentChat && !app.chat.is_empty() && area.width >= 80;
+    let (left, right) = if split {
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Percentage(40),
+                Constraint::Length(1),
+                Constraint::Min(0),
+            ])
+            .split(area);
+        (cols[0], Some(cols[2]))
+    } else {
+        (area, None)
+    };
+    let comp_h = composer_rows(app, placeholder, left.width);
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -238,31 +282,16 @@ fn draw_workspace(frame: &mut Frame, area: Rect, app: &TuiApp) {
             Constraint::Length(1),
             Constraint::Length(comp_h),
         ])
-        .split(area);
+        .split(left);
     if app.active_tab == ActiveTab::AgentChat {
-        draw_chat_row(frame, rows[0], app);
+        draw_transcript(frame, rows[0], app);
     } else {
         draw_content(frame, rows[0], app);
     }
     draw_input_header(frame, rows[2], app);
     draw_composer(frame, rows[3], app, placeholder);
-}
-
-fn draw_chat_row(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    if area.width >= 60 {
-        let rail_w = ((area.width as u32 * 20 / 100) as u16).max(24);
-        let cols = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([
-                Constraint::Min(0),
-                Constraint::Length(1),
-                Constraint::Length(rail_w),
-            ])
-            .split(area);
-        draw_transcript(frame, cols[0], app);
-        draw_rail(frame, cols[2], app);
-    } else {
-        draw_transcript(frame, area, app);
+    if let Some(right) = right {
+        crate::analysis_view::draw_analysis(frame, right, app);
     }
 }
 
@@ -274,7 +303,8 @@ fn draw_transcript(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let mut lines: Vec<Line<'static>> = Vec::new();
     let last = app.chat.len().saturating_sub(1);
     for (i, msg) in app.chat.messages.iter().enumerate() {
-        if i > 0 {
+        let tool_run = msg.tool.is_some() && i > 0 && app.chat.messages[i - 1].tool.is_some();
+        if i > 0 && !tool_run {
             lines.push(Line::from(""));
         }
         let loading = app.is_loading && i == last;
@@ -290,87 +320,6 @@ fn draw_transcript(frame: &mut Frame, area: Rect, app: &TuiApp) {
             .wrap(Wrap { trim: false }),
         inner,
     );
-}
-
-fn draw_rail(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let block = theme::panel_block(
-        &format!("Market ({})", app.live.watchlist.len()),
-        theme::ACCENT,
-    )
-    .style(Style::default().bg(theme::BACKGROUND_PANEL));
-    let inner = pad(block.inner(area), 1, 1, 1);
-    frame.render_widget(block, area);
-
-    let foot_h: u16 = if inner.height > 6 { 4 } else { 0 };
-    let body = sub(
-        inner,
-        0,
-        0,
-        inner.width,
-        inner.height.saturating_sub(foot_h),
-    );
-    let mut lines: Vec<Line<'static>> = Vec::new();
-    if app.live.watchlist.is_empty() {
-        lines.push(Line::from(Span::styled(
-            "no market data yet",
-            theme::fg(theme::TEXT_MUTED),
-        )));
-    } else {
-        for row in &app.live.watchlist {
-            let color = if row.change >= Decimal::ZERO {
-                theme::SUCCESS
-            } else {
-                theme::ERROR
-            };
-            lines.push(Line::from(Span::styled(
-                row.symbol.clone(),
-                theme::fg(theme::TEXT),
-            )));
-            lines.push(Line::from(vec![
-                Span::styled(row.last.to_string(), theme::fg(theme::TEXT)),
-                Span::raw("  "),
-                Span::styled(
-                    format!("{:+}%", row.change_pct.round_dp(2)),
-                    theme::fg(color),
-                ),
-            ]));
-            lines.push(Line::from(""));
-        }
-    }
-    frame.render_widget(Paragraph::new(lines), body);
-
-    if foot_h > 0 {
-        let fy = inner.height - foot_h;
-        let foot = vec![
-            Line::from(Span::styled(
-                "─".repeat(inner.width as usize),
-                theme::fg(theme::BORDER),
-            )),
-            Line::from(Span::styled(
-                format!("{} messages", app.chat.len()),
-                theme::fg(theme::TEXT_MUTED),
-            )),
-            Line::from(Span::styled(
-                format!(
-                    "auto-approve {}",
-                    if app.auto_approve { "on" } else { "off" }
-                ),
-                theme::fg(theme::TEXT_MUTED),
-            )),
-            Line::from(Span::styled(
-                format!(
-                    "backend {}",
-                    if app.live.connected {
-                        "connected"
-                    } else {
-                        "offline"
-                    }
-                ),
-                theme::fg(theme::TEXT_MUTED),
-            )),
-        ];
-        frame.render_widget(Paragraph::new(foot), sub(inner, 0, fy, inner.width, foot_h));
-    }
 }
 
 fn draw_input_header(frame: &mut Frame, area: Rect, app: &TuiApp) {
@@ -510,7 +459,7 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &TuiApp) {
         ActiveTab::Orders => draw_orders(frame, area, app),
         ActiveTab::Backtest => draw_backtest(frame, area, app),
         ActiveTab::Algos => draw_algos(frame, area, app),
-        ActiveTab::AgentChat => draw_chat_row(frame, area, app),
+        ActiveTab::AgentChat => draw_transcript(frame, area, app),
         ActiveTab::StrategyLab => crate::strategy_lab::draw_strategy_lab(frame, area, app),
     }
 }

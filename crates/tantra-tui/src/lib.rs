@@ -20,6 +20,7 @@
 
 pub mod agent_chat;
 pub mod analysis;
+pub mod analysis_view;
 pub mod app;
 pub mod keybindings;
 pub mod layout;

@@ -62,8 +62,8 @@ fn research_view_shows_transcript_and_rail() {
     let t = text(&rows);
     assert!(t.contains("› Hello agent"));
     assert!(rows.iter().any(|r| r.trim_start().starts_with("╭─Tantra")));
-    assert!(t.contains("Market (0)"));
-    assert!(t.contains("no market data yet"));
+    assert!(t.contains("╭─Analysis"));
+    assert!(t.contains("analysis appears here"));
     assert!(t.contains("ask a follow-up"));
 }
 
