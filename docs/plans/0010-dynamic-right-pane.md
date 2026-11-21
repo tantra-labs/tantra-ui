@@ -13,8 +13,11 @@ show their views, an LLM analysis query shows the Analysis page, and when the ag
 ## 1. Context & Gaps Covered
 
 - Agent plan `0020` (`present_view` tool, `DisplayBlock::View`, `PRESENT_VIEW_GUIDANCE`).
-- Agent plan `0019` Phase 3 (the TUI switching to `AcpClient`) is still pending and is the next
-  step; the embedded agent in `terminal.rs` registers `create_presentation_tools()` meanwhile.
+- Agent plan `0019` Phase 3 (`86d35ee`): agent turns now run over `AcpClient`.
+  - By default it's an embedded host (`agent_link::embedded_host`: strategy + presentation tools).
+  - `tantra --server ws://…/v1/acp [--token-file PATH]` connects to the runtime instead. There the
+    agent has the runtime's full tool set, so analysis queries use real data tools and open the
+    `present_view` layout in the right pane.
 
 ## 2. Component Specifications & Phases
 
