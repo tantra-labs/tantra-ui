@@ -35,7 +35,7 @@ pub async fn run_terminal(mut app: TuiApp, conn: AgentConnection) -> Result<(), 
     )
     .await
     .map_err(|_| io::Error::other("agent connection timed out"))?
-    .map_err(|e| io::Error::other(format!("agent connection failed: {e}")))?;
+    .map_err(|e| io::Error::other(connect_error_message(&conn, &e.to_string())))?;
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -234,4 +234,24 @@ pub fn turn_outcome_update(outcome: &tantra_agent_chat::TurnOutcome) -> AgentStr
             AgentStreamUpdate::Error("cancelled".to_string())
         }
     }
+}
+
+/// Human-readable connection failure, with a hint for the common wrong-URL cases.
+pub fn connect_error_message(conn: &AgentConnection, err: &str) -> String {
+    let mut msg = format!("agent connection failed: {err}");
+    if let AgentConnection::Remote { url, .. } = conn {
+        if err.contains("HTTP 404") {
+            msg.push_str(&format!(
+                "\n  {url} has no ACP endpoint. Point --server at the tantra runtime \
+                 (tantra-ui-web/scripts/start-backend.sh, port 8000), e.g. \
+                 ws://127.0.0.1:8000{}; port 8080 is the LLM server, not the runtime.",
+                crate::agent_link::RUNTIME_ACP_PATH
+            ));
+        } else if err.contains("onnection refused") || err.contains("unreachable") {
+            msg.push_str(
+                "\n  nothing is listening there — start the runtime: tantra-ui-web/scripts/start-backend.sh",
+            );
+        }
+    }
+    msg
 }

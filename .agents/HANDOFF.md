@@ -5,7 +5,7 @@
 > - `/help` and the info commands open panes, as do the strategy/backtest views and the agent's
 >   `present_view` (`DisplayBlock::View`).
 > - `86d35ee`: agent turns run over `AcpClient` (`agent_link.rs`); the TUI is embedded by default,
->   `--server ws://…/v1/acp --token-file PATH` connects remotely, and `/model` lists or switches models.
+>   `--server ws://…/api/v1/acp --token-file PATH` connects remotely, and `/model` lists or switches models.
 > - Next: `tantra ask` on `AcpClient` (agent plan 0019 Phase 3 remainder).
 >
 > Updated: 2026-11-17 — **PLAN 0006 PHASES 2–4 IMPLEMENTED (T12.9 remainder)**:

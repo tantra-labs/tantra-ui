@@ -128,3 +128,37 @@ fn model_command_lists_and_switches() {
     app.execute_slash_command("/model zzz");
     assert!(app.pending_model.is_none());
 }
+
+#[test]
+fn bare_server_url_gets_runtime_acp_path() {
+    use tantra_tui::agent_link::acp_url;
+    assert_eq!(
+        acp_url("ws://127.0.0.1:8000"),
+        "ws://127.0.0.1:8000/api/v1/acp"
+    );
+    assert_eq!(
+        acp_url("ws://127.0.0.1:8000/"),
+        "ws://127.0.0.1:8000/api/v1/acp"
+    );
+    assert_eq!(
+        acp_url("ws://127.0.0.1:8000/api/v2/acp"),
+        "ws://127.0.0.1:8000/api/v2/acp"
+    );
+    assert_eq!(acp_url("wss://h.example"), "wss://h.example/api/v1/acp");
+}
+
+#[test]
+fn http_404_connect_error_points_at_the_runtime() {
+    use tantra_tui::agent_link::AgentConnection;
+    use tantra_tui::terminal::connect_error_message;
+    let conn = AgentConnection::Remote {
+        url: "ws://127.0.0.1:8080/v1/acp".into(),
+        token: None,
+    };
+    let msg = connect_error_message(
+        &conn,
+        "acp protocol error: websocket handshake rejected: HTTP 404 Not Found",
+    );
+    assert!(msg.contains("ws://127.0.0.1:8000/api/v1/acp"), "{msg}");
+    assert!(msg.contains("8080 is the LLM server"), "{msg}");
+}

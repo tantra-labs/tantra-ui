@@ -36,11 +36,11 @@ fn bases() {
         token: None,
     };
     assert_eq!(
-        runtime_base(&r("ws://127.0.0.1:8000/v1/acp")),
+        runtime_base(&r("ws://127.0.0.1:8000/api/v1/acp")),
         "http://127.0.0.1:8000"
     );
     assert_eq!(
-        runtime_base(&r("wss://h.example/v1/acp")),
+        runtime_base(&r("wss://h.example/api/v1/acp")),
         "https://h.example"
     );
     let conn = AgentConnection::Embedded {
@@ -120,7 +120,7 @@ async fn fetches_over_http() {
     let req = server.await.unwrap();
     let line = req.lines().next().unwrap();
     assert!(
-        line.contains("/v1/bars/NIFTY50-INDEX.NSE?tf=1d&from=2026-07-01"),
+        line.contains("/api/v2/bars/NIFTY50-INDEX.NSE?tf=1d&from=2026-07-01"),
         "{line}"
     );
 }

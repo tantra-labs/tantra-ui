@@ -211,7 +211,7 @@ fn draw_price(frame: &mut Frame, area: Rect, app: &TuiApp) {
                     )
                 } else if error.starts_with(PriceFeedError::NO_BARS_TEXT) {
                     format!(
-                        "no daily bars for {} in the runtime's data dir",
+                        "the runtime has no daily bars for {} (not in its instrument list or data dir)",
                         base_symbol(sym)
                     )
                 } else if error == "HTTP 401" || error == "HTTP 403" {

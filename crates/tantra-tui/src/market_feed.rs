@@ -1,4 +1,4 @@
-//! Daily-bar price feed for the Analysis Price card (runtime `GET /v1/bars/{id}`).
+//! Daily-bar price feed for the Analysis Price card (runtime `GET /api/v2/bars/{id}`).
 
 use std::fmt;
 use std::str::FromStr;
@@ -84,7 +84,7 @@ pub fn runtime_base(conn: &AgentConnection) -> String {
     }
 }
 
-/// Extract closes (oldest first) from a `/v1/bars` response body.
+/// Extract closes (oldest first) from an `/api/v2/bars` response body.
 pub fn parse_bar_closes(body: &serde_json::Value) -> Result<Vec<Decimal>, PriceFeedError> {
     let root = body.get("data").unwrap_or(body);
     let bars = root
@@ -153,7 +153,7 @@ impl PriceFeed {
             })
             .collect();
         let url = format!(
-            "{}/v1/bars/{}?tf=1d&from={}",
+            "{}/api/v2/bars/{}?tf=1d&from={}",
             self.base.trim_end_matches('/'),
             encoded,
             from.format("%Y-%m-%d")
@@ -167,6 +167,11 @@ impl PriceFeed {
             .await
             .map_err(|e| PriceFeedError::Unreachable(e.without_url().to_string()))?;
         let status = resp.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            // The runtime answers 404 `not_found` when the instrument is not in its
+            // instrument master / data dir: there are no bars to show.
+            return Err(PriceFeedError::NoBars);
+        }
         if !status.is_success() {
             return Err(PriceFeedError::Http(status.as_u16()));
         }

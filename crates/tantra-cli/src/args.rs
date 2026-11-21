@@ -636,7 +636,7 @@ pub struct Cli {
     #[arg(short = 'r', long = "resume", global = true)]
     pub resume: Option<String>,
 
-    /// Connect the TUI to a runtime ACP endpoint, e.g. ws://127.0.0.1:8000/v1/acp, instead of the embedded agent.
+    /// Connect the TUI to a runtime ACP endpoint, e.g. ws://127.0.0.1:8000/api/v1/acp (or just ws://127.0.0.1:8000), instead of the embedded agent.
     #[arg(long = "server", value_name = "WS_URL")]
     pub server: Option<String>,
 

@@ -1,4 +1,4 @@
-//! Link between the TUI and the agent over ACP (embedded host or runtime `/v1/acp`).
+//! Link between the TUI and the agent over ACP (embedded host or runtime `/api/v1/acp`).
 
 use std::fmt;
 use std::sync::Arc;
@@ -29,7 +29,7 @@ pub enum AgentConnection {
     },
     /// Runtime ACP websocket endpoint (full runtime tool set).
     Remote {
-        /// `ws://host:port/v1/acp`.
+        /// `ws://host:port/api/v1/acp` (a bare `ws://host:port` gets that path).
         url: String,
         /// Bearer token (never logged).
         token: Option<String>,
@@ -91,7 +91,7 @@ pub async fn connect(
                 approve: Some(approve),
                 ..Default::default()
             };
-            connect_ws(url, token.as_deref(), opts).await
+            connect_ws(&acp_url(url), token.as_deref(), opts).await
         }
     }
 }
@@ -131,5 +131,19 @@ pub fn map_client_event(ev: ClientEvent) -> Option<AgentStreamUpdate> {
             Some(AgentStreamUpdate::Error(format!("turn ended: {other:?}")))
         }
         ClientEvent::Error(e) => Some(AgentStreamUpdate::Error(e)),
+    }
+}
+
+/// Default ACP path on the runtime (`/api/v1` router, `acp_ws_handler`).
+pub const RUNTIME_ACP_PATH: &str = "/api/v1/acp";
+
+/// Complete a `--server` URL: a bare `ws://host:port` (no path) gets [`RUNTIME_ACP_PATH`].
+pub fn acp_url(url: &str) -> String {
+    let trimmed = url.trim().trim_end_matches('/');
+    let after_scheme = trimmed.split_once("://").map_or(trimmed, |(_, rest)| rest);
+    if after_scheme.contains('/') {
+        trimmed.to_string()
+    } else {
+        format!("{trimmed}{RUNTIME_ACP_PATH}")
     }
 }
