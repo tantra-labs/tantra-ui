@@ -7,6 +7,8 @@
 //! `TuiApp::publish`, and the `draw_*` routines only ever read this state —
 //! they never fetch, never touch the clock, and never do I/O.
 
+use std::collections::{BTreeMap, VecDeque};
+
 use rust_decimal::Decimal;
 
 use tantra_core::{Bar, FillReport, OrderEvent, ScreenerRow, Tick};
@@ -150,7 +152,13 @@ pub struct LiveData {
     pub paper_cash: Decimal,
     /// Paper equity (cash + MTM; plan 0008 D3).
     pub paper_equity: Decimal,
+    /// Rolling per-symbol price history (oldest first, capped at
+    /// [`PRICE_HISTORY_CAP`]) feeding the analysis-page chart.
+    pub price_history: BTreeMap<String, VecDeque<Decimal>>,
 }
+
+/// Maximum retained price points per symbol.
+pub const PRICE_HISTORY_CAP: usize = 240;
 
 impl LiveData {
     /// Create an honest, empty live-data state (no seeded fake rows).
@@ -167,6 +175,7 @@ impl LiveData {
             paper_positions: Vec::new(),
             paper_cash: Decimal::ZERO,
             paper_equity: Decimal::ZERO,
+            price_history: BTreeMap::new(),
         }
     }
 
@@ -189,6 +198,35 @@ impl LiveData {
             paper_positions: Vec::new(),
             paper_cash: Decimal::ZERO,
             paper_equity: Decimal::ZERO,
+            price_history: BTreeMap::new(),
+        }
+    }
+
+    /// Price history for `symbol` (oldest first).
+    pub fn history(&self, symbol: &str) -> Option<&VecDeque<Decimal>> {
+        self.price_history.get(symbol)
+    }
+
+    /// Watchlist quote row for `symbol`.
+    pub fn quote(&self, symbol: &str) -> Option<&WatchlistRow> {
+        self.watchlist.iter().find(|r| r.symbol == symbol)
+    }
+
+    /// Paper depth row for `symbol`.
+    pub fn depth(&self, symbol: &str) -> Option<&PaperDepthRow> {
+        self.paper_depth.iter().find(|r| r.instrument == symbol)
+    }
+
+    /// Paper position row for `symbol`.
+    pub fn position(&self, symbol: &str) -> Option<&PaperPositionRow> {
+        self.paper_positions.iter().find(|r| r.instrument == symbol)
+    }
+
+    fn record_price(&mut self, symbol: &str, price: Decimal) {
+        let hist = self.price_history.entry(symbol.to_string()).or_default();
+        hist.push_back(price);
+        while hist.len() > PRICE_HISTORY_CAP {
+            hist.pop_front();
         }
     }
 
@@ -309,7 +347,10 @@ impl LiveData {
                 price,
                 volume,
                 ..
-            } => self.upsert_price(format!("{instrument}"), price.0, Some(volume.0)),
+            } => {
+                self.record_price(&format!("{instrument}"), price.0);
+                self.upsert_price(format!("{instrument}"), price.0, Some(volume.0));
+            }
             Tick::Quote {
                 instrument,
                 bid,
@@ -343,6 +384,7 @@ impl LiveData {
     fn apply_bar(&mut self, bar: &Bar) {
         let symbol = format!("{}", bar.instrument);
         let close = bar.close.0;
+        self.record_price(&symbol, close);
         let volume = bar.volume.0;
         if let Some(row) = self.watchlist.iter_mut().find(|r| r.symbol == symbol) {
             let prev_close = row.last;

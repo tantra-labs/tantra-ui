@@ -15,7 +15,10 @@ use tantra_ui_core::{
     infer_asset_class,
 };
 
-use crate::agent_chat::{AgentMessage, AgentRole, ChatTranscript};
+use crate::agent_chat::{
+    AgentMessage, AgentRole, AgentStreamUpdate, ChatTranscript, ToolRow, ToolStatus,
+};
+use crate::analysis::{AnalysisPage, detect_instruments};
 use crate::keybindings::{Action, handle_key};
 use crate::live_data::LiveData;
 
@@ -413,6 +416,8 @@ pub struct TuiApp {
     pub should_quit: bool,
     /// Live-data state fed by canonical `ClientEvent`s (gap 0005).
     pub live: LiveData,
+    /// Dynamic analysis page state (right pane of the split Agent view).
+    pub analysis: AnalysisPage,
     /// The agent chat transcript.
     pub chat: ChatTranscript,
     /// Index of the selected row in the active data tab.
@@ -526,6 +531,7 @@ impl TuiApp {
             active_tab: ActiveTab::AgentChat,
             should_quit: false,
             live: LiveData::new(),
+            analysis: AnalysisPage::default(),
             chat,
             selected_index: 0,
             input_buffer: String::new(),
@@ -615,6 +621,13 @@ impl TuiApp {
 
     /// Submit a prompt to the agent, switching to the Agent view.
     pub fn submit_prompt(&mut self, prompt: String) {
+        let known: Vec<String> = self
+            .live
+            .watchlist
+            .iter()
+            .map(|r| r.symbol.clone())
+            .collect();
+        self.analysis.focus_on(detect_instruments(&prompt, &known));
         self.active_tab = ActiveTab::AgentChat;
         self.chat
             .push(AgentMessage::new(AgentRole::User, prompt.clone()));
@@ -623,8 +636,95 @@ impl TuiApp {
         self.is_loading = true;
     }
 
+    /// Fold one background agent-turn update into the transcript/analysis state.
+    pub fn apply_stream_update(&mut self, update: AgentStreamUpdate) {
+        match update {
+            AgentStreamUpdate::Token(delta) => {
+                let clean = delta.replace("<|im_end|>", "").replace("<|im_start|>", "");
+                match self.chat.last_mut() {
+                    Some(last) if last.role == AgentRole::Agent => last.text.push_str(&clean),
+                    _ => self.chat.push(AgentMessage::new(AgentRole::Agent, clean)),
+                }
+            }
+            AgentStreamUpdate::ToolStarted { name, summary, .. } => {
+                if self
+                    .chat
+                    .last()
+                    .is_some_and(|m| m.role == AgentRole::Agent && m.text.is_empty())
+                {
+                    self.chat.messages.pop();
+                }
+                self.chat.push(AgentMessage::tool_row(ToolRow {
+                    name,
+                    summary,
+                    status: ToolStatus::Running,
+                    elapsed_ms: None,
+                }));
+            }
+            AgentStreamUpdate::ToolFinished {
+                name,
+                ok,
+                elapsed_ms,
+                blocks,
+                ..
+            } => {
+                let row = self.chat.messages.iter_mut().rev().find_map(|m| {
+                    m.tool
+                        .as_mut()
+                        .filter(|t| t.name == name && t.status == ToolStatus::Running)
+                });
+                if let Some(row) = row {
+                    row.status = if ok {
+                        ToolStatus::Ok
+                    } else {
+                        ToolStatus::Error
+                    };
+                    row.elapsed_ms = Some(elapsed_ms);
+                }
+                self.analysis.push_blocks(&name, blocks);
+            }
+            AgentStreamUpdate::Finished => {
+                if let Some(last) = self.chat.last_mut() {
+                    if last.role == AgentRole::Agent {
+                        let trimmed = last.text.trim();
+                        if last.text != trimmed {
+                            last.text = trimmed.to_string();
+                        }
+                    }
+                }
+                let had_tool = self.chat.messages.iter().any(|m| m.role == AgentRole::Tool);
+                if had_tool
+                    && self
+                        .chat
+                        .last()
+                        .is_some_and(|m| m.role == AgentRole::Agent && m.text.is_empty())
+                {
+                    self.chat.messages.pop();
+                }
+                self.is_loading = false;
+            }
+            AgentStreamUpdate::Error(err) => {
+                match self.chat.last_mut() {
+                    Some(last) if last.role == AgentRole::Agent => {
+                        if last.text.is_empty() {
+                            last.text = format!("*Error: {err}*");
+                        } else {
+                            last.text.push_str(&format!("\n\n*Error: {err}*"));
+                        }
+                    }
+                    _ => self.chat.push(AgentMessage::new(
+                        AgentRole::Agent,
+                        format!("*Error: {err}*"),
+                    )),
+                }
+                self.is_loading = false;
+            }
+        }
+    }
+
     fn start_new_session(&mut self) {
         self.chat.clear();
+        self.analysis.clear();
         self.input_buffer.clear();
         self.is_loading = false;
         self.pending_prompt = None;
@@ -796,14 +896,20 @@ impl TuiApp {
                 ));
             }
             "/backtest" => match self.run_backtest_for_strategy(arg) {
-                Ok(msg) => self.chat.push(AgentMessage::new(AgentRole::System, msg)),
+                Ok(msg) => {
+                    self.analysis.show_backtest = true;
+                    self.chat.push(AgentMessage::new(AgentRole::System, msg));
+                }
                 Err(err) => self.chat.push(AgentMessage::new(
                     AgentRole::System,
                     format!("Backtest error: {err}"),
                 )),
             },
             "/tune" => match self.tune_for_strategy(arg) {
-                Ok(msg) => self.chat.push(AgentMessage::new(AgentRole::System, msg)),
+                Ok(msg) => {
+                    self.analysis.show_backtest = true;
+                    self.chat.push(AgentMessage::new(AgentRole::System, msg));
+                }
                 Err(err) => self.chat.push(AgentMessage::new(
                     AgentRole::System,
                     format!("Tuning error: {err}"),
@@ -1230,6 +1336,20 @@ impl TuiApp {
             self.palette_query.clear();
             self.palette_selected = 0;
             return;
+        }
+
+        if !self.is_palette_open {
+            match key.code {
+                KeyCode::PageDown => {
+                    self.analysis.scroll_down();
+                    return;
+                }
+                KeyCode::PageUp => {
+                    self.analysis.scroll_up();
+                    return;
+                }
+                _ => {}
+            }
         }
 
         // Command palette modal navigation

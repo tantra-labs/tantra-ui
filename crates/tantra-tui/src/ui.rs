@@ -93,7 +93,7 @@ fn message_lines(msg: &AgentMessage, tick: u64, loading: bool) -> Vec<Line<'stat
                 ])
             })
             .collect(),
-        AgentRole::System => msg
+        AgentRole::System | AgentRole::Tool => msg
             .text
             .split('\n')
             .map(|l| Line::from(Span::styled(l.to_string(), theme::fg(theme::TEXT_MUTED))))

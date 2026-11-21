@@ -1,5 +1,6 @@
 //! Interactive terminal event loop and LLM stream orchestration.
 
+use std::collections::HashSet;
 use std::io::{self, Stdout};
 use std::sync::Arc;
 use std::time::Duration;
@@ -11,24 +12,18 @@ use crossterm::terminal::{
 };
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
-use rust_decimal::Decimal;
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, mpsc};
 
-use tantra_agent_llm::{ChatMessage, ChatRequest, ChatStreamEvent, LlmProvider};
+use tantra_agent_chat::{
+    CancellationToken, InMemorySessionStore, PermissionDecision, SessionEvent, ToolOutcome,
+    ToolRegistry, TurnConfig, TurnId, run_turn,
+};
+use tantra_agent_core::{PersistedMessage, SessionStore};
+use tantra_agent_llm::LlmProvider;
 
+use crate::agent_chat::AgentStreamUpdate;
 use crate::app::TuiApp;
 use crate::ui;
-
-/// Update message emitted by background agent token streamer.
-#[derive(Debug)]
-pub enum AgentStreamUpdate {
-    /// Token text fragment.
-    Token(String),
-    /// Turn completed normally.
-    Finished,
-    /// An error occurred during generation.
-    Error(String),
-}
 
 /// Run the interactive Ratatui terminal workstation.
 ///
@@ -54,12 +49,24 @@ pub async fn run_terminal(
     res
 }
 
+const SYSTEM_PROMPT: &str = "You are Tantra, an intelligent quantitative finance and algorithmic trading assistant for Indian equities (NSE/BSE).";
+
 async fn run_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     app: &mut TuiApp,
     provider: Arc<dyn LlmProvider>,
 ) -> Result<(), io::Error> {
     let (token_tx, mut token_rx) = mpsc::channel::<AgentStreamUpdate>(128);
+
+    let mut registry = ToolRegistry::new();
+    registry.register_all(tantra_agent_chat_tools::catalog::create_strategy_tools(
+        None,
+    ));
+    let tools = Arc::new(registry.snapshot());
+    let store: Arc<dyn SessionStore> = Arc::new(InMemorySessionStore::new());
+    let history: Arc<Mutex<Vec<PersistedMessage>>> = Arc::new(Mutex::new(Vec::new()));
+    let grants: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
+    let mut turn_counter: u64 = 0;
 
     loop {
         app.tick = app.tick.wrapping_add(1);
@@ -71,73 +78,104 @@ async fn run_loop(
 
         // Drain any incoming tokens from background streaming task
         while let Ok(update) = token_rx.try_recv() {
-            match update {
-                AgentStreamUpdate::Token(delta) => {
-                    if let Some(last) = app.chat.last_mut() {
-                        let clean = delta.replace("<|im_end|>", "").replace("<|im_start|>", "");
-                        last.text.push_str(&clean);
-                    }
-                }
-                AgentStreamUpdate::Finished => {
-                    if let Some(last) = app.chat.last_mut() {
-                        let trimmed = last.text.trim();
-                        if last.text != trimmed {
-                            last.text = trimmed.to_string();
-                        }
-                    }
-                    app.is_loading = false;
-                }
-                AgentStreamUpdate::Error(err) => {
-                    if let Some(last) = app.chat.last_mut() {
-                        if last.text.is_empty() {
-                            last.text = format!("*Error: {err}*");
-                        } else {
-                            last.text.push_str(&format!("\n\n*Error: {err}*"));
-                        }
-                    }
-                    app.is_loading = false;
-                }
-            }
+            app.apply_stream_update(update);
         }
 
         // Check if user submitted a prompt on the Agent tab
         if let Some(prompt) = app.pending_prompt.take() {
-            let provider_cloned = Arc::clone(&provider);
+            turn_counter += 1;
+            let turn = turn_counter;
+            let auto_approve = app.auto_approve;
+            let provider = Arc::clone(&provider);
+            let tools = Arc::clone(&tools);
+            let store = Arc::clone(&store);
+            let history = Arc::clone(&history);
+            let grants = Arc::clone(&grants);
             let tx = token_tx.clone();
 
             tokio::spawn(async move {
-                let strategy_tools = tantra_agent_chat_tools::catalog::create_strategy_tools(None)
-                    .into_iter()
-                    .map(|t| t.spec().clone())
-                    .collect::<Vec<_>>();
-
-                let req = ChatRequest {
-                    messages: vec![ChatMessage::user(prompt)],
-                    system_prompt: Some("You are Tantra, an intelligent quantitative finance and algorithmic trading assistant for Indian equities (NSE/BSE).".to_string()),
-                    tools: strategy_tools,
-                    temperature: Some(Decimal::new(7, 1)),
-                    max_tokens: Some(1024),
-                };
-
-                match provider_cloned.chat_stream(&req).await {
-                    Ok(mut stream) => {
-                        use futures::StreamExt;
-                        while let Some(event_res) = stream.next().await {
-                            match event_res {
-                                Ok(ChatStreamEvent::TextDelta { text }) => {
-                                    let _ = tx.send(AgentStreamUpdate::Token(text)).await;
+                let (ev_tx, mut ev_rx) = mpsc::channel::<SessionEvent>(256);
+                let fwd_tx = tx.clone();
+                let forwarder = tokio::spawn(async move {
+                    while let Some(ev) = ev_rx.recv().await {
+                        let update = match ev {
+                            SessionEvent::TextDelta { text, .. } => {
+                                Some(AgentStreamUpdate::Token(text))
+                            }
+                            SessionEvent::ToolStarted {
+                                call_id,
+                                name,
+                                summary,
+                                ..
+                            } => Some(AgentStreamUpdate::ToolStarted {
+                                call_id: format!("{call_id:?}"),
+                                name,
+                                summary,
+                            }),
+                            SessionEvent::ToolFinished {
+                                call_id,
+                                name,
+                                outcome,
+                                elapsed_ms,
+                                blocks,
+                                ..
+                            } => Some(AgentStreamUpdate::ToolFinished {
+                                call_id: format!("{call_id:?}"),
+                                name,
+                                ok: matches!(outcome, ToolOutcome::Success),
+                                elapsed_ms,
+                                blocks,
+                            }),
+                            SessionEvent::PermissionRequested(mut prompt) => {
+                                if let Some(responder) = prompt.responder.take() {
+                                    let decision = if auto_approve {
+                                        PermissionDecision::AllowOnce
+                                    } else {
+                                        PermissionDecision::Deny {
+                                            feedback: Some(
+                                                "not approved — enable /auto to let the agent run this tool"
+                                                    .into(),
+                                            ),
+                                        }
+                                    };
+                                    let _ = responder.respond(decision);
                                 }
-                                Ok(ChatStreamEvent::MessageEnd { .. }) => {
-                                    let _ = tx.send(AgentStreamUpdate::Finished).await;
-                                    return;
-                                }
-                                Err(e) => {
-                                    let _ = tx.send(AgentStreamUpdate::Error(e.to_string())).await;
-                                    return;
-                                }
-                                _ => {}
+                                None
+                            }
+                            SessionEvent::TurnEnded { .. } => Some(AgentStreamUpdate::Finished),
+                            _ => None,
+                        };
+                        if let Some(u) = update {
+                            if fwd_tx.send(u).await.is_err() {
+                                break;
                             }
                         }
+                    }
+                });
+
+                let hist = history.lock().await.clone();
+                let grant_set = grants.lock().await.clone();
+                let result = run_turn(
+                    None,
+                    TurnId(turn),
+                    SYSTEM_PROMPT,
+                    hist,
+                    &prompt,
+                    Vec::new(),
+                    &tools,
+                    provider,
+                    store,
+                    ev_tx,
+                    &TurnConfig::default(),
+                    CancellationToken::new(),
+                    grant_set,
+                )
+                .await;
+                let _ = forwarder.await;
+                match result {
+                    Ok((_outcome, new_history, new_grants)) => {
+                        *history.lock().await = new_history;
+                        *grants.lock().await = new_grants;
                         let _ = tx.send(AgentStreamUpdate::Finished).await;
                     }
                     Err(e) => {

@@ -13,6 +13,66 @@ pub enum AgentRole {
     Agent,
     /// System notices.
     System,
+    /// A tool-call status row.
+    Tool,
+}
+
+/// Lifecycle state of a tool call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolStatus {
+    /// Still executing.
+    Running,
+    /// Finished successfully.
+    Ok,
+    /// Failed or was denied.
+    Error,
+}
+
+/// A tool-call row shown in the transcript.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ToolRow {
+    /// Tool name.
+    pub name: String,
+    /// Short human summary of the call.
+    pub summary: String,
+    /// Current status.
+    pub status: ToolStatus,
+    /// Elapsed milliseconds once finished.
+    pub elapsed_ms: Option<u64>,
+}
+
+/// Update message emitted by the background agent turn task.
+#[derive(Debug)]
+pub enum AgentStreamUpdate {
+    /// Token text fragment.
+    Token(String),
+    /// A tool call started.
+    ToolStarted {
+        /// Call id.
+        call_id: String,
+        /// Tool name.
+        name: String,
+        /// Short summary.
+        summary: String,
+    },
+    /// A tool call finished.
+    ToolFinished {
+        /// Call id.
+        call_id: String,
+        /// Tool name.
+        name: String,
+        /// Whether the tool succeeded.
+        ok: bool,
+        /// Elapsed milliseconds.
+        elapsed_ms: u64,
+        /// Typed result blocks.
+        blocks: Vec<tantra_agent_core::DisplayBlock>,
+    },
+    /// Turn completed normally.
+    Finished,
+    /// An error occurred during generation.
+    Error(String),
 }
 
 /// A single message in the chat history.
@@ -22,6 +82,9 @@ pub struct AgentMessage {
     pub role: AgentRole,
     /// The text content of the message.
     pub text: String,
+    /// Tool-call details when `role == Tool`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool: Option<ToolRow>,
 }
 
 impl AgentMessage {
@@ -30,6 +93,16 @@ impl AgentMessage {
         Self {
             role,
             text: text.into(),
+            tool: None,
+        }
+    }
+
+    /// Construct a tool-call row message.
+    pub fn tool_row(row: ToolRow) -> Self {
+        Self {
+            role: AgentRole::Tool,
+            text: row.name.clone(),
+            tool: Some(row),
         }
     }
 
