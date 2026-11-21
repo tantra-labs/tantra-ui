@@ -66,7 +66,7 @@ fn draw_tab_strip(frame: &mut Frame, area: Rect, app: &TuiApp) {
     }
     let hint_w = TAB_HINT.chars().count() as u16;
     let total: usize = spans.iter().map(|s| s.content.chars().count()).sum();
-    let show_hint = total as u16 + hint_w + 2 <= area.width;
+    let show_hint = total + usize::from(hint_w) + 2 <= usize::from(area.width);
     let tabs_w = if show_hint {
         area.width - hint_w - 1
     } else {

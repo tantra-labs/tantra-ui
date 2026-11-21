@@ -195,3 +195,23 @@ fn help_renders_in_right_pane_not_welcome() {
     assert!(text.contains("/backtest"));
     assert!(!text.contains("|_   _|_ _ _ __"));
 }
+
+#[test]
+fn new_command_drops_previous_session_cards() {
+    let mut app = TuiApp::new();
+    app.submit_prompt("look at NIFTY".to_string());
+    app.apply_stream_update(AgentStreamUpdate::ToolFinished {
+        call_id: "1".into(),
+        name: "t".into(),
+        ok: true,
+        elapsed_ms: 1,
+        blocks: vec![DisplayBlock::Alert {
+            level: "info".into(),
+            message: "old".into(),
+        }],
+    });
+    assert!(!app.analysis.cards.is_empty());
+    app.execute_slash_command("/new");
+    assert!(app.analysis.cards.is_empty());
+    assert!(app.panes.is_empty());
+}

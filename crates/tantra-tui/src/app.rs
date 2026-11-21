@@ -1075,6 +1075,7 @@ impl TuiApp {
             "/new" => {
                 self.panes.clear();
                 self.turn = 0;
+                self.analysis.clear();
                 self.chat.clear();
                 self.undo_stack.clear();
                 self.chat.push(AgentMessage::new(
