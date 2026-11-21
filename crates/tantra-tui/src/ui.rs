@@ -186,7 +186,7 @@ fn truncate(s: &str, max: usize) -> String {
 /// Draw the entire workstation UI onto a Ratatui Frame.
 pub fn draw(frame: &mut Frame, app: &TuiApp) {
     let layout = LayoutModel::new(frame.area());
-    if app.active_tab == ActiveTab::AgentChat && app.chat.is_empty() {
+    if app.active_tab == ActiveTab::AgentChat && app.chat.is_empty() && app.panes.is_empty() {
         draw_welcome(frame, layout.main, app);
     } else {
         draw_workspace(frame, layout.main, app);
@@ -259,7 +259,7 @@ fn draw_workspace(frame: &mut Frame, area: Rect, app: &TuiApp) {
     } else {
         "press i to ask, / for commands"
     };
-    let split = app.active_tab == ActiveTab::AgentChat && !app.chat.is_empty() && area.width >= 80;
+    let split = app.active_tab == ActiveTab::AgentChat && !app.panes.is_empty() && area.width >= 80;
     let (left, right) = if split {
         let cols = Layout::default()
             .direction(Direction::Horizontal)
@@ -291,7 +291,7 @@ fn draw_workspace(frame: &mut Frame, area: Rect, app: &TuiApp) {
     draw_input_header(frame, rows[2], app);
     draw_composer(frame, rows[3], app, placeholder);
     if let Some(right) = right {
-        crate::analysis_view::draw_analysis(frame, right, app);
+        crate::pane_view::draw_pane(frame, right, app);
     }
 }
 
@@ -734,7 +734,7 @@ fn draw_screener(frame: &mut Frame, area: Rect, app: &TuiApp) {
     frame.render_widget(table, area);
 }
 
-fn draw_portfolio(frame: &mut Frame, area: Rect, app: &TuiApp) {
+pub(crate) fn draw_portfolio(frame: &mut Frame, area: Rect, app: &TuiApp) {
     // The Portfolio tab is split: the live snapshot summary on top and the
     // EE+ positioning panel below (plan 0006 Phase 4 — same `studio_ee_positions`
     // rows the web Studio and `tantra elephant` render).
@@ -1105,7 +1105,7 @@ fn draw_algos(frame: &mut Frame, area: Rect, app: &TuiApp) {
     frame.render_widget(action_bar, action_bar_area);
 }
 
-fn draw_backtest(frame: &mut Frame, area: Rect, app: &TuiApp) {
+pub(crate) fn draw_backtest(frame: &mut Frame, area: Rect, app: &TuiApp) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])

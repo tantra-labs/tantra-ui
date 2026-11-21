@@ -338,7 +338,7 @@ fn draw_backtest(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
 /// Card height (border included). `ResultBlockWidget` draws its own border, which
 /// shares the card's outer frame (see `draw_tool_card`), so no extra rows are needed.
-fn tool_height(block: &DisplayBlock) -> u16 {
+pub(crate) fn tool_height(block: &DisplayBlock) -> u16 {
     let h = match block {
         DisplayBlock::Table { rows, .. } => (rows.len() + 3).min(12),
         DisplayBlock::MetricGrid { items } => items.len().min(8) + 2,
@@ -365,7 +365,7 @@ fn block_label(block: &DisplayBlock) -> String {
     }
 }
 
-fn draw_tool_card(frame: &mut Frame, area: Rect, tool: &str, block: &DisplayBlock) {
+pub(crate) fn draw_tool_card(frame: &mut Frame, area: Rect, tool: &str, block: &DisplayBlock) {
     let title = format!("{} · {}", tool.replace('_', " "), block_label(block));
     let frame_block = card_block(&title);
     let inner = frame_block.inner(area);

@@ -176,17 +176,13 @@ fn test_slash_commands_execution() {
 
     // Test /help
     app.execute_slash_command("/help");
-    assert!(
-        app.chat
-            .last()
-            .unwrap()
-            .text
-            .contains("Tantra Slash Commands")
-    );
+    assert!(app.chat.is_empty());
+    assert_eq!(app.panes.active().unwrap().title, "Help");
 
     // Test /help with specific command
     app.execute_slash_command("/help agent");
-    assert!(app.chat.last().unwrap().text.contains("Command /agent:"));
+    assert!(app.chat.is_empty());
+    assert_eq!(app.panes.active().unwrap().title, "Help · /agent");
 
     // Test /agent
     app.execute_slash_command("/agent quant-deepseek");
@@ -219,6 +215,13 @@ fn test_slash_commands_execution() {
     assert!(app.chat.is_empty());
 }
 
+fn pane_text(app: &TuiApp) -> String {
+    match app.panes.active().map(|p| &p.body) {
+        Some(tantra_tui::pane::PaneBody::Info { lines }) => lines.join("\n"),
+        _ => String::new(),
+    }
+}
+
 #[test]
 fn test_hardened_quantcept_slash_commands() {
     let mut app = TuiApp::new();
@@ -226,11 +229,11 @@ fn test_hardened_quantcept_slash_commands() {
 
     // /perf
     app.execute_slash_command("/perf");
-    assert!(app.chat.last().unwrap().text.contains("Inference Speed"));
+    assert!(pane_text(&app).contains("Inference Speed"));
 
     // /context
     app.execute_slash_command("/context");
-    assert!(app.chat.last().unwrap().text.contains("Token Budget"));
+    assert!(pane_text(&app).contains("Token Budget"));
 
     // /remember
     app.execute_slash_command("/remember Always hedge NIFTY options delta");
@@ -238,24 +241,24 @@ fn test_hardened_quantcept_slash_commands() {
 
     // /skills
     app.execute_slash_command("/skills");
-    assert!(app.chat.last().unwrap().text.contains("quant"));
-    assert!(app.chat.last().unwrap().text.contains("analyst"));
+    assert!(pane_text(&app).contains("quant"));
+    assert!(pane_text(&app).contains("analyst"));
 
     // /mcp
     app.execute_slash_command("/mcp");
-    assert!(app.chat.last().unwrap().text.contains("context7"));
+    assert!(pane_text(&app).contains("context7"));
 
     // /account
     app.execute_slash_command("/account");
-    assert!(app.chat.last().unwrap().text.contains("SEBI Risk Engine"));
+    assert!(pane_text(&app).contains("SEBI Risk Engine"));
 
     // /settings
     app.execute_slash_command("/settings");
-    assert!(app.chat.last().unwrap().text.contains("Theme"));
+    assert!(pane_text(&app).contains("Theme"));
 
     // /usage
     app.execute_slash_command("/usage");
-    assert!(app.chat.last().unwrap().text.contains("Local Tokens"));
+    assert!(pane_text(&app).contains("Local Tokens"));
 
     // /positions
     app.execute_slash_command("/positions");

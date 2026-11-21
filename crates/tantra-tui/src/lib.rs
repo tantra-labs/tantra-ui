@@ -25,6 +25,8 @@ pub mod app;
 pub mod keybindings;
 pub mod layout;
 pub mod live_data;
+pub mod pane;
+pub mod pane_view;
 pub mod positioning;
 pub mod result_block;
 pub mod strategy_lab;

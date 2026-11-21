@@ -132,6 +132,8 @@ pub struct ToolCard {
     pub tool: String,
     /// Typed result block.
     pub block: DisplayBlock,
+    /// Conversation turn that produced the card.
+    pub turn: u64,
 }
 
 /// State of the dynamic analysis page.
@@ -158,13 +160,14 @@ impl AnalysisPage {
     }
 
     /// Add each block as a card at the front (capped).
-    pub fn push_blocks(&mut self, tool: &str, blocks: Vec<DisplayBlock>) {
+    pub fn push_blocks(&mut self, tool: &str, turn: u64, blocks: Vec<DisplayBlock>) {
         for block in blocks {
             self.cards.insert(
                 0,
                 ToolCard {
                     tool: tool.to_string(),
                     block,
+                    turn,
                 },
             );
         }

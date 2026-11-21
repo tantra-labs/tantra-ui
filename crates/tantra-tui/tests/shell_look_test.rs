@@ -4,6 +4,7 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 use ratatui::style::Color;
+use tantra_tui::pane::{Pane, PaneBody};
 use tantra_tui::{ActiveTab, AgentMessage, AgentRole, TuiApp, draw};
 
 fn key(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
@@ -58,6 +59,7 @@ fn research_view_shows_transcript_and_rail() {
         .push(AgentMessage::new(AgentRole::User, "Hello agent"));
     app.chat
         .push(AgentMessage::new(AgentRole::Agent, "Hi there"));
+    app.panes.open(Pane::new("Analysis", PaneBody::Analysis));
     let (rows, _) = render(&app, 120, 36);
     let t = text(&rows);
     assert!(t.contains("› Hello agent"));

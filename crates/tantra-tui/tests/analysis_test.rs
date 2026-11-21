@@ -83,7 +83,7 @@ fn page_focus_cap_and_order() {
 fn page_cards_cap_newest_first_and_scroll() {
     let mut p = AnalysisPage::default();
     for i in 0..15 {
-        p.push_blocks("t", vec![alert(&i.to_string())]);
+        p.push_blocks("t", 0, vec![alert(&i.to_string())]);
     }
     assert_eq!(p.cards.len(), 12);
     assert_eq!(p.cards[0].block, alert("14"));

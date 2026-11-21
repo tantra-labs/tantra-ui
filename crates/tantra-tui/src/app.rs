@@ -3,6 +3,7 @@
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use tantra_agent_core::DisplayBlock;
 use tantra_core::signals::PositionIntent;
 use tantra_ui_charts::scene::SceneLayerGroup;
 use tantra_ui_core::algos::AlgoStatus;
@@ -18,9 +19,10 @@ use tantra_ui_core::{
 use crate::agent_chat::{
     AgentMessage, AgentRole, AgentStreamUpdate, ChatTranscript, ToolRow, ToolStatus,
 };
-use crate::analysis::{AnalysisPage, detect_instruments};
+use crate::analysis::{AnalysisPage, base_symbol, detect_instruments};
 use crate::keybindings::{Action, handle_key};
 use crate::live_data::LiveData;
+use crate::pane::{AgentView, Pane, PaneBody, PaneStack, view_kind_label};
 
 /// The workstation tabs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -202,6 +204,10 @@ pub const SLASH_COMMANDS: &[(&str, &str)] = &[
         "List available slash commands and shortcuts (/help [command])",
     ),
     (
+        "/pane",
+        "Manage right-hand panes (/pane [list|next|prev|close])",
+    ),
+    (
         "/agent",
         "Switch or inspect active persona (/agent <name|off|default>)",
     ),
@@ -330,6 +336,29 @@ pub const SLASH_COMMANDS: &[(&str, &str)] = &[
     ("/exit", "Exit the workstation cleanly"),
 ];
 
+/// Informational slash commands whose output is shown in an Info pane.
+pub const INFO_PANE_COMMANDS: &[&str] = &[
+    "/mcp",
+    "/skills",
+    "/plugins",
+    "/marketplace",
+    "/memory",
+    "/knowledge",
+    "/learnings",
+    "/context",
+    "/usage",
+    "/jobs",
+    "/checkpoints",
+    "/artifacts",
+    "/workspaces",
+    "/settings",
+    "/account",
+    "/perf",
+    "/cloud",
+    "/billing",
+    "/upgrade",
+];
+
 /// Palette command groups, in display order. Commands not listed fall into "Other".
 pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
     (
@@ -381,6 +410,7 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
         "Reference",
         &[
             "/help",
+            "/pane",
             "/mcp",
             "/plugins",
             "/marketplace",
@@ -465,6 +495,10 @@ pub struct TuiApp {
     pub strategy_lab: StrategyLabState,
     /// Animation tick counter (spinner).
     pub tick: u64,
+    /// Right-hand panes of the Agent view.
+    pub panes: PaneStack,
+    /// Conversation turn counter (incremented per submitted prompt).
+    pub turn: u64,
 }
 
 impl TuiApp {
@@ -557,6 +591,8 @@ impl TuiApp {
             ee_positions: ee_seed_positions(),
             strategy_lab: StrategyLabState::new(),
             tick: 0,
+            panes: PaneStack::default(),
+            turn: 0,
         }
     }
 
@@ -632,6 +668,12 @@ impl TuiApp {
             .map(|r| r.symbol.clone())
             .collect();
         self.analysis.focus_on(detect_instruments(&prompt, &known));
+        self.turn += 1;
+        let title = match self.analysis.primary() {
+            Some(sym) => format!("Analysis · {}", base_symbol(sym)),
+            None => "Analysis".to_string(),
+        };
+        self.panes.open(Pane::new(title, PaneBody::Analysis));
         self.active_tab = ActiveTab::AgentChat;
         self.chat
             .push(AgentMessage::new(AgentRole::User, prompt.clone()));
@@ -685,7 +727,35 @@ impl TuiApp {
                     };
                     row.elapsed_ms = Some(elapsed_ms);
                 }
-                self.analysis.push_blocks(&name, blocks);
+                let mut rest = Vec::new();
+                for block in blocks {
+                    match block {
+                        DisplayBlock::View {
+                            kind,
+                            title,
+                            symbols,
+                            summary,
+                            highlights,
+                            include_tools,
+                        } => {
+                            let pane_title = format!("{}: {}", view_kind_label(kind), title);
+                            self.panes.open(Pane::new(
+                                pane_title,
+                                PaneBody::View(AgentView {
+                                    kind,
+                                    title,
+                                    symbols,
+                                    summary,
+                                    highlights,
+                                    include_tools,
+                                    turn: self.turn,
+                                }),
+                            ));
+                        }
+                        other => rest.push(other),
+                    }
+                }
+                self.analysis.push_blocks(&name, self.turn, rest);
             }
             AgentStreamUpdate::Finished => {
                 if let Some(last) = self.chat.last_mut() {
@@ -729,6 +799,8 @@ impl TuiApp {
     fn start_new_session(&mut self) {
         self.chat.clear();
         self.analysis.clear();
+        self.panes.clear();
+        self.turn = 0;
         self.input_buffer.clear();
         self.is_loading = false;
         self.pending_prompt = None;
@@ -744,7 +816,39 @@ impl TuiApp {
     }
 
     /// Execute a slash command locally without calling LLM.
+    ///
+    /// Informational commands have their System output redirected into an
+    /// Info pane; strategy/backtest commands open their views in the pane.
     pub fn execute_slash_command(&mut self, line: &str) {
+        let cmd = line.split_whitespace().next().unwrap_or("");
+        let before = self.chat.messages.len();
+        self.dispatch_slash_command(line);
+        if matches!(cmd, "/ee-study" | "/loop-eval" | "/loop-sweep" | "/hedge") {
+            self.panes
+                .open(Pane::new("Strategy Lab", PaneBody::StrategyLab));
+        }
+        if INFO_PANE_COMMANDS.contains(&cmd) && self.chat.messages.len() >= before {
+            let tail: Vec<AgentMessage> = self.chat.messages.split_off(before);
+            let mut lines: Vec<String> = Vec::new();
+            for m in tail {
+                if m.role == AgentRole::System {
+                    lines.extend(m.text.split('\n').map(str::to_string));
+                } else {
+                    self.chat.messages.push(m);
+                }
+            }
+            if !lines.is_empty() {
+                self.panes
+                    .open(Pane::new(cmd.to_string(), PaneBody::Info { lines }));
+            }
+        }
+    }
+
+    fn open_backtest_pane(&mut self) {
+        self.panes.open(Pane::new("Backtest", PaneBody::Backtest));
+    }
+
+    fn dispatch_slash_command(&mut self, line: &str) {
         let parts: Vec<&str> = line.split_whitespace().collect();
         let cmd = parts.first().copied().unwrap_or("");
         let arg = parts.get(1).copied().unwrap_or("");
@@ -902,6 +1006,7 @@ impl TuiApp {
             "/backtest" => match self.run_backtest_for_strategy(arg) {
                 Ok(msg) => {
                     self.analysis.show_backtest = true;
+                    self.open_backtest_pane();
                     self.chat.push(AgentMessage::new(AgentRole::System, msg));
                 }
                 Err(err) => self.chat.push(AgentMessage::new(
@@ -912,6 +1017,7 @@ impl TuiApp {
             "/tune" => match self.tune_for_strategy(arg) {
                 Ok(msg) => {
                     self.analysis.show_backtest = true;
+                    self.open_backtest_pane();
                     self.chat.push(AgentMessage::new(AgentRole::System, msg));
                 }
                 Err(err) => self.chat.push(AgentMessage::new(
@@ -920,45 +1026,55 @@ impl TuiApp {
                 )),
             },
             "/suggest" => match self.suggest_for_strategy(arg) {
-                Ok(msg) => self.chat.push(AgentMessage::new(AgentRole::System, msg)),
+                Ok(msg) => {
+                    self.open_backtest_pane();
+                    self.chat.push(AgentMessage::new(AgentRole::System, msg));
+                }
                 Err(err) => self.chat.push(AgentMessage::new(
                     AgentRole::System,
                     format!("Trade suggestion error: {err}"),
                 )),
             },
             "/help" => {
-                if !arg.is_empty() {
-                    let search = if arg.starts_with('/') {
-                        arg
-                    } else {
-                        &format!("/{arg}")
-                    };
-                    if let Some((c, desc)) = SLASH_COMMANDS.iter().find(|(c, _)| *c == search) {
-                        self.chat.push(AgentMessage::new(
-                            AgentRole::System,
-                            format!("Command {c}:\n  {desc}\n  Run in-session via prompt or Ctrl+P modal palette."),
-                        ));
-                    } else {
-                        self.chat.push(AgentMessage::new(
-                            AgentRole::System,
-                            format!(
-                                "Unknown command '{arg}'. Type /help to view all slash commands."
-                            ),
-                        ));
-                    }
+                let topic = if arg.is_empty() {
+                    None
+                } else if arg.starts_with('/') {
+                    Some(arg.to_string())
                 } else {
-                    let mut help = String::from("Tantra Slash Commands Reference:\n");
-                    for (c, desc) in SLASH_COMMANDS {
-                        help.push_str(&format!("  {:<15} {}\n", c, desc));
-                    }
-                    help.push_str("\nKeys: [Ctrl+P or /] Palette, [Tab] Autocomplete, [Enter] Run, [Esc] Normal mode, [1-8] Tabs");
-                    self.chat.push(AgentMessage::new(AgentRole::System, help));
-                }
+                    Some(format!("/{arg}"))
+                };
+                let title = match &topic {
+                    Some(t) => format!("Help · {t}"),
+                    None => "Help".to_string(),
+                };
+                self.panes.open(Pane::new(title, PaneBody::Help { topic }));
             }
+            "/pane" => match arg {
+                "next" => self.panes.next(),
+                "prev" => self.panes.prev(),
+                "close" => self.panes.close_active(),
+                _ => {
+                    let lines: Vec<String> = self
+                        .panes
+                        .titles()
+                        .into_iter()
+                        .map(|(t, active)| format!("{} {t}", if active { "▸" } else { " " }))
+                        .collect();
+                    let lines = if lines.is_empty() {
+                        vec!["No panes open.".to_string()]
+                    } else {
+                        lines
+                    };
+                    self.panes
+                        .open(Pane::new("Panes", PaneBody::Info { lines }));
+                }
+            },
             "/clear" => {
                 self.chat.clear();
             }
             "/new" => {
+                self.panes.clear();
+                self.turn = 0;
                 self.chat.clear();
                 self.undo_stack.clear();
                 self.chat.push(AgentMessage::new(
@@ -1184,6 +1300,7 @@ impl TuiApp {
             }
             "/positions" => {
                 let panel = crate::live_data::paper_panel_text(&self.live);
+                self.panes.open(Pane::new("Portfolio", PaneBody::Portfolio));
                 self.chat.push(AgentMessage::new(AgentRole::System, panel));
             }
             "/artifacts" => {
@@ -1342,17 +1459,59 @@ impl TuiApp {
             return;
         }
 
-        if !self.is_palette_open {
+        if !self.is_palette_open
+            && self.active_tab == ActiveTab::AgentChat
+            && key.modifiers.contains(KeyModifiers::ALT)
+        {
             match key.code {
-                KeyCode::PageDown => {
-                    self.analysis.scroll_down();
+                KeyCode::Left => {
+                    self.panes.prev();
                     return;
                 }
-                KeyCode::PageUp => {
-                    self.analysis.scroll_up();
+                KeyCode::Right => {
+                    self.panes.next();
+                    return;
+                }
+                KeyCode::Char('x') => {
+                    self.panes.close_active();
                     return;
                 }
                 _ => {}
+            }
+        }
+
+        if !self.is_palette_open {
+            let down = match key.code {
+                KeyCode::PageDown => Some(true),
+                KeyCode::PageUp => Some(false),
+                _ => None,
+            };
+            if let Some(down) = down {
+                match self.panes.active_mut() {
+                    Some(pane) if self.active_tab == ActiveTab::AgentChat => {
+                        if pane.body == PaneBody::Analysis {
+                            if down {
+                                self.analysis.scroll_down();
+                            } else {
+                                self.analysis.scroll_up();
+                            }
+                        } else {
+                            pane.scroll = if down {
+                                pane.scroll.saturating_add(1)
+                            } else {
+                                pane.scroll.saturating_sub(1)
+                            };
+                        }
+                    }
+                    _ => {
+                        if down {
+                            self.analysis.scroll_down();
+                        } else {
+                            self.analysis.scroll_up();
+                        }
+                    }
+                }
+                return;
             }
         }
 

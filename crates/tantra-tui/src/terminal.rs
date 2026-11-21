@@ -62,7 +62,12 @@ async fn run_loop(
     registry.register_all(tantra_agent_chat_tools::catalog::create_strategy_tools(
         None,
     ));
+    registry.register_all(tantra_agent_chat_tools::catalog::create_presentation_tools());
     let tools = Arc::new(registry.snapshot());
+    let system_prompt = format!(
+        "{SYSTEM_PROMPT}\n\n{}",
+        tantra_agent_chat_tools::PRESENT_VIEW_GUIDANCE
+    );
     let store: Arc<dyn SessionStore> = Arc::new(InMemorySessionStore::new());
     let history: Arc<Mutex<Vec<PersistedMessage>>> = Arc::new(Mutex::new(Vec::new()));
     let grants: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
@@ -91,6 +96,7 @@ async fn run_loop(
             let store = Arc::clone(&store);
             let history = Arc::clone(&history);
             let grants = Arc::clone(&grants);
+            let system_prompt = system_prompt.clone();
             let tx = token_tx.clone();
 
             tokio::spawn(async move {
@@ -160,7 +166,7 @@ async fn run_loop(
                 let result = run_turn(
                     None,
                     TurnId(turn),
-                    SYSTEM_PROMPT,
+                    &system_prompt,
                     hist,
                     &prompt,
                     Vec::new(),
