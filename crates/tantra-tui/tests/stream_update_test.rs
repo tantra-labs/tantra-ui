@@ -119,3 +119,25 @@ fn ctrl_n_clears_analysis() {
     app.on_key(KeyEvent::new(KeyCode::Char('n'), KeyModifiers::CONTROL));
     assert!(app.analysis.is_empty());
 }
+
+#[test]
+fn failed_turn_outcome_surfaces_as_a_visible_error() {
+    use tantra_agent_chat::{ChatErrorView, TurnOutcome};
+    use tantra_tui::terminal::turn_outcome_update;
+    let err = ChatErrorView {
+        kind: "transport".into(),
+        message: "GGUF model file not found".into(),
+    };
+    let upd = turn_outcome_update(&TurnOutcome::Failed { error: err });
+    let mut app = TuiApp::new();
+    app.submit_prompt("What is NIFTY?".into());
+    app.apply_stream_update(AgentStreamUpdate::Finished);
+    app.apply_stream_update(upd);
+    assert!(!app.is_loading);
+    let last = app.chat.last().map(|m| m.text.clone()).unwrap_or_default();
+    assert!(last.contains("GGUF model file not found"), "{last}");
+    assert!(matches!(
+        turn_outcome_update(&TurnOutcome::Completed),
+        AgentStreamUpdate::Finished
+    ));
+}

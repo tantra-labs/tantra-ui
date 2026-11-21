@@ -35,7 +35,8 @@ fn signed_color(d: Decimal) -> ratatui::style::Color {
 }
 
 fn card_block(title: &str) -> ratatui::widgets::Block<'static> {
-    theme::panel_block(title, theme::ACCENT)
+    // Trading-R1 docked inset: content sits one column in from the border.
+    theme::panel_block(title, theme::ACCENT).padding(ratatui::widgets::Padding::horizontal(1))
 }
 
 /// Draw the full-height analysis pane into `area`.
@@ -252,8 +253,10 @@ fn draw_spread_position(frame: &mut Frame, area: Rect, app: &TuiApp, stacked: bo
             [Constraint::Percentage(50), Constraint::Percentage(50)],
         )
     };
+    let gap = u16::from(dir == Direction::Horizontal);
     let halves = Layout::default()
         .direction(dir)
+        .spacing(gap)
         .constraints(cons)
         .split(area);
 

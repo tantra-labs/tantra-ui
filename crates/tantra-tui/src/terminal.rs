@@ -16,7 +16,7 @@ use tokio::sync::{Mutex, mpsc};
 
 use tantra_agent_chat::{
     CancellationToken, InMemorySessionStore, PermissionDecision, SessionEvent, ToolOutcome,
-    ToolRegistry, TurnConfig, TurnId, run_turn,
+    ToolRegistry, TurnConfig, TurnId, TurnOutcome, run_turn,
 };
 use tantra_agent_core::{PersistedMessage, SessionStore};
 use tantra_agent_llm::LlmProvider;
@@ -142,7 +142,9 @@ async fn run_loop(
                                 }
                                 None
                             }
-                            SessionEvent::TurnEnded { .. } => Some(AgentStreamUpdate::Finished),
+                            SessionEvent::TurnEnded { outcome, .. } => {
+                                Some(turn_outcome_update(&outcome))
+                            }
                             _ => None,
                         };
                         if let Some(u) = update {
@@ -173,10 +175,14 @@ async fn run_loop(
                 .await;
                 let _ = forwarder.await;
                 match result {
-                    Ok((_outcome, new_history, new_grants)) => {
+                    Ok((outcome, new_history, new_grants)) => {
                         *history.lock().await = new_history;
                         *grants.lock().await = new_grants;
-                        let _ = tx.send(AgentStreamUpdate::Finished).await;
+                        // TurnEnded normally carries this already; resending is idempotent
+                        // for Finished and covers a turn that ended without the event.
+                        if matches!(turn_outcome_update(&outcome), AgentStreamUpdate::Finished) {
+                            let _ = tx.send(AgentStreamUpdate::Finished).await;
+                        }
                     }
                     Err(e) => {
                         let _ = tx.send(AgentStreamUpdate::Error(e.to_string())).await;
@@ -194,4 +200,20 @@ async fn run_loop(
     }
 
     Ok(())
+}
+
+/// Map a terminal turn outcome to the transcript update: a clean finish, or an
+/// error line the user can see (a failed provider, a refusal, a round limit).
+pub fn turn_outcome_update(outcome: &TurnOutcome) -> AgentStreamUpdate {
+    match outcome {
+        TurnOutcome::Completed | TurnOutcome::MaxTokens => AgentStreamUpdate::Finished,
+        TurnOutcome::Failed { error } => AgentStreamUpdate::Error(error.message.clone()),
+        TurnOutcome::Refused { reason } => AgentStreamUpdate::Error(format!("refused: {reason}")),
+        TurnOutcome::RoundLimit { limit } => {
+            AgentStreamUpdate::Error(format!("stopped after {limit} tool rounds"))
+        }
+        TurnOutcome::Stopped | TurnOutcome::Cancelled => {
+            AgentStreamUpdate::Error("cancelled".to_string())
+        }
+    }
 }
