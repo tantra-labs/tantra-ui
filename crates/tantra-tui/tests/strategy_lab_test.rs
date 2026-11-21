@@ -35,7 +35,8 @@ fn strategy_lab_renders_canvas_layers_hints_penetration_and_tables() {
     let mut terminal = Terminal::new(backend).unwrap();
     let mut app = TuiApp::new();
 
-    // Pressing '8' switches directly to StrategyLab
+    // Leave input mode, then '8' switches directly to StrategyLab
+    app.is_input_mode = false;
     app.on_key(key(KeyCode::Char('8')));
     assert_eq!(app.active_tab, ActiveTab::StrategyLab);
 
@@ -97,6 +98,7 @@ fn strategy_lab_renders_canvas_layers_hints_penetration_and_tables() {
 fn strategy_lab_layer_toggles_hint_cursor_and_param_tweaks_update_state() {
     let mut app = TuiApp::new();
     app.active_tab = ActiveTab::StrategyLab;
+    app.is_input_mode = false;
 
     // Layer toggles [1..6]
     assert!(app.strategy_lab.vm.scene.layers.signals);

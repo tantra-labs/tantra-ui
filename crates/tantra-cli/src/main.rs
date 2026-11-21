@@ -8,7 +8,7 @@ use tantra_agent_llm::{CandleGgufConfig, CandleGgufProvider};
 use tantra_cli::args::parse;
 use tantra_cli::jobs_runtime::boot_recover;
 use tantra_cli::runner::{CliError, CommandOutcome, resolve_provider, run, tantra_home_dir};
-use tantra_tui::{ActiveTab, TuiApp};
+use tantra_tui::TuiApp;
 
 fn main() -> ExitCode {
     let cli = parse();
@@ -39,9 +39,7 @@ fn main() -> ExitCode {
                         app.auto_approve = true;
                     }
                     if let Some(ref msg) = cli.message {
-                        app.active_tab = ActiveTab::AgentChat;
-                        app.pending_prompt = Some(msg.clone());
-                        app.is_loading = true;
+                        app.submit_prompt(msg.clone());
                     }
 
                     let rt = tokio::runtime::Runtime::new().expect("failed to start tokio runtime");

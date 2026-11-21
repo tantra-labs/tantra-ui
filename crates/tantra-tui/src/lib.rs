@@ -27,6 +27,7 @@ pub mod positioning;
 pub mod result_block;
 pub mod strategy_lab;
 pub mod terminal;
+pub mod theme;
 pub mod ui;
 
 pub use agent_chat::{AgentMessage, AgentRole, ChatTranscript};

@@ -4,7 +4,7 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Row, Sparkline, Table, Tabs, Wrap};
+use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph, Row, Sparkline, Table, Wrap};
 use rust_decimal::Decimal;
 use tantra_ui_core::algos::AlgoStatus;
 
@@ -13,165 +13,447 @@ use tantra_highlight::HighlightClass;
 use crate::agent_chat::{AgentMessage, AgentRole};
 use crate::app::{ActiveTab, TuiApp};
 use crate::layout::LayoutModel;
+use crate::theme;
 
-/// Map a syntax highlight lexical class to a Ratatui style.
+/// 8x8 dot-matrix Tantra mark (`#` = filled).
+const MARK: [&str; 8] = [
+    "#..##..#", "#..##..#", "#..##..#", "########", ".######.", "...##...", "...##...", "...##...",
+];
+
+/// Figlet wordmark.
+const WORDMARK: [&str; 5] = [
+    r" _____           _             ",
+    r"|_   _|_ _ _ __ | |_ _ __ __ _ ",
+    r"  | |/ _` | '_ \| __| '__/ _` |",
+    r"  | | (_| | | | | |_| | | (_| |",
+    r"  |_|\__,_|_| |_|\__|_|  \__,_|",
+];
+
+/// Map a syntax highlight lexical class to a Ratatui style (markdown palette).
 pub fn class_to_style(class: HighlightClass) -> Style {
     match class {
-        HighlightClass::Keyword => Style::default()
-            .fg(Color::Cyan)
-            .add_modifier(Modifier::BOLD),
-        HighlightClass::String => Style::default().fg(Color::Green),
-        HighlightClass::Comment => Style::default()
-            .fg(Color::DarkGray)
-            .add_modifier(Modifier::ITALIC),
-        HighlightClass::Number => Style::default().fg(Color::Yellow),
-        HighlightClass::Function => Style::default()
-            .fg(Color::LightBlue)
-            .add_modifier(Modifier::BOLD),
-        HighlightClass::Type => Style::default().fg(Color::LightCyan),
-        HighlightClass::Punctuation => Style::default().fg(Color::White),
-        HighlightClass::Plain => Style::default().fg(Color::Reset),
+        HighlightClass::Keyword => theme::bold(theme::MD_H1),
+        HighlightClass::String => theme::fg(theme::MD_CODE),
+        HighlightClass::Comment => theme::fg(theme::TEXT_MUTED).add_modifier(Modifier::ITALIC),
+        HighlightClass::Number => theme::fg(theme::MD_CODE),
+        HighlightClass::Function => theme::bold(theme::MD_H2),
+        HighlightClass::Type => theme::fg(theme::MD_H3),
+        HighlightClass::Punctuation => theme::fg(theme::TEXT_MUTED),
+        HighlightClass::Plain => theme::fg(theme::TEXT),
+    }
+}
+
+/// Split highlighted markdown into styled lines.
+fn markdown_lines(msg: &AgentMessage) -> Vec<Vec<Span<'static>>> {
+    let mut segs: Vec<(String, Style)> = Vec::new();
+    let mut pos = 0usize;
+    for span in msg.highlight() {
+        if span.range.start > pos {
+            if let Some(gap) = msg.text.get(pos..span.range.start) {
+                segs.push((gap.to_string(), class_to_style(HighlightClass::Plain)));
+            }
+        }
+        if let Some(t) = msg.text.get(span.range.clone()) {
+            segs.push((t.to_string(), class_to_style(span.class)));
+        }
+        pos = pos.max(span.range.end);
+    }
+    if let Some(rest) = msg.text.get(pos..) {
+        if !rest.is_empty() {
+            segs.push((rest.to_string(), class_to_style(HighlightClass::Plain)));
+        }
+    }
+    let mut lines: Vec<Vec<Span<'static>>> = vec![Vec::new()];
+    for (text, style) in segs {
+        for (i, part) in text.split('\n').enumerate() {
+            if i > 0 {
+                lines.push(Vec::new());
+            }
+            if !part.is_empty() {
+                if let Some(cur) = lines.last_mut() {
+                    cur.push(Span::styled(part.to_string(), style));
+                }
+            }
+        }
+    }
+    lines
+}
+
+fn message_lines(msg: &AgentMessage, tick: u64, loading: bool) -> Vec<Line<'static>> {
+    match msg.role {
+        AgentRole::User => msg
+            .text
+            .split('\n')
+            .enumerate()
+            .map(|(i, l)| {
+                let prefix = if i == 0 { "› " } else { "  " };
+                Line::from(vec![
+                    Span::styled(prefix, theme::fg(theme::PRIMARY)),
+                    Span::styled(l.to_string(), theme::bold(theme::TEXT)),
+                ])
+            })
+            .collect(),
+        AgentRole::System => msg
+            .text
+            .split('\n')
+            .map(|l| Line::from(Span::styled(l.to_string(), theme::fg(theme::TEXT_MUTED))))
+            .collect(),
+        AgentRole::Agent => {
+            if msg.text.is_empty() {
+                if loading {
+                    vec![Line::from(Span::styled(
+                        format!("{} thinking…", theme::spinner_frame(tick)),
+                        theme::fg(theme::ACCENT),
+                    ))]
+                } else {
+                    vec![Line::from("")]
+                }
+            } else if let Some(err) = msg.text.strip_prefix("*Error:") {
+                let err = err.trim().trim_end_matches('*').trim();
+                vec![Line::from(Span::styled(
+                    format!("error: {err}"),
+                    theme::fg(theme::ERROR),
+                ))]
+            } else {
+                markdown_lines(msg).into_iter().map(Line::from).collect()
+            }
+        }
     }
 }
 
 /// Convert an AgentMessage with highlights into Ratatui Lines.
 pub fn message_to_lines(msg: &AgentMessage) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
+    message_lines(msg, 0, true)
+}
 
-    let (badge, badge_style) = match msg.role {
-        AgentRole::User => (
-            "[User] ",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-        AgentRole::Agent => (
-            "[Tantra] ",
-            Style::default()
-                .fg(Color::Green)
-                .add_modifier(Modifier::BOLD),
-        ),
-        AgentRole::System => (
-            "[System] ",
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::DIM),
-        ),
-    };
+/// Clamp a rect built from raw offsets into `area`.
+fn sub(area: Rect, x: u16, y: u16, w: u16, h: u16) -> Rect {
+    Rect::new(area.x.saturating_add(x), area.y.saturating_add(y), w, h).intersection(area)
+}
 
-    lines.push(Line::from(vec![Span::styled(badge, badge_style)]));
+fn pad(area: Rect, left: u16, right: u16, top: u16) -> Rect {
+    sub(
+        area,
+        left,
+        top,
+        area.width.saturating_sub(left + right),
+        area.height.saturating_sub(top),
+    )
+}
 
-    if msg.text.is_empty() {
-        lines.push(Line::from(vec![Span::styled(
-            "⚡ Thinking...",
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::ITALIC),
-        )]));
+fn truncate(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else if max == 0 {
+        String::new()
     } else {
-        for l in msg.text.lines() {
-            lines.push(Line::from(Span::raw(l.to_string())));
-        }
+        let mut out: String = s.chars().take(max - 1).collect();
+        out.push('…');
+        out
     }
-
-    lines.push(Line::from(""));
-    lines
 }
 
 /// Draw the entire workstation UI onto a Ratatui Frame.
 pub fn draw(frame: &mut Frame, app: &TuiApp) {
     let layout = LayoutModel::new(frame.area());
-
-    // 1. Header
-    draw_header(frame, layout.header, app);
-
-    // 2. Tabs
-    draw_tabs(frame, layout.tabs, app);
-
-    // 3. Content
-    draw_content(frame, layout.content, app);
-
-    // 4. Footer
-    draw_footer(frame, layout.footer, app);
-
-    // 5. Palette overlay
+    if app.active_tab == ActiveTab::AgentChat && app.chat.is_empty() {
+        draw_welcome(frame, layout.main, app);
+    } else {
+        draw_workspace(frame, layout.main, app);
+    }
+    draw_footer(frame, layout.footer);
     if app.is_palette_open {
         draw_palette(frame, frame.area(), app);
     }
 }
 
-fn draw_header(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let mode_str = if app.is_palette_open {
-        Span::styled(
-            " [COMMAND PALETTE] ",
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::Magenta)
-                .add_modifier(Modifier::BOLD),
-        )
-    } else if app.is_input_mode {
-        Span::styled(
-            " [CHAT INPUT] ",
-            Style::default()
-                .fg(Color::Black)
-                .bg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        )
-    } else {
-        Span::styled(
-            " [NORMAL] ",
-            Style::default()
-                .fg(Color::DarkGray)
-                .add_modifier(Modifier::DIM),
-        )
-    };
+fn draw_welcome(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    let area = pad(area, 2, 2, 0);
+    let block_h: u16 = 8 + 3 + 1 + 3;
+    let rem = area.height.saturating_sub(block_h);
+    let top = rem * 7 / 15;
+    let logo_area = sub(area, 0, top, area.width, 8);
 
-    let title_line = Line::from(vec![
-        Span::styled(
-            "व्यापार・Tantra",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" | Indian Equities Quantitative Workstation "),
-        mode_str,
-        Span::styled(
-            format!(" | Persona: {}", app.model_name),
-            Style::default().fg(Color::Green),
-        ),
-    ]);
-
-    let p = Paragraph::new(title_line).alignment(Alignment::Left);
-    frame.render_widget(p, area);
-}
-
-fn draw_tabs(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let titles: Vec<Line> = ActiveTab::ALL
+    let wm_w = WORDMARK
         .iter()
-        .enumerate()
-        .map(|(i, tab)| {
-            let num = i + 1;
-            Line::from(format!(" {num}:{tab_title} ", tab_title = tab.title()))
+        .map(|l| l.chars().count())
+        .max()
+        .unwrap_or(0) as u16;
+    let logo_w = 16 + 3 + wm_w;
+    let lx = area.width.saturating_sub(logo_w) / 2;
+    let mark: Vec<Line> = MARK
+        .iter()
+        .map(|row| {
+            let spans: Vec<Span> = row
+                .chars()
+                .map(|c| {
+                    if c == '#' {
+                        Span::styled("● ", theme::fg(theme::PRIMARY))
+                    } else {
+                        Span::styled("○ ", theme::fg(theme::TEXT_MUTED))
+                    }
+                })
+                .collect();
+            Line::from(spans)
         })
         .collect();
-
-    let selected_tab_index = ActiveTab::ALL
+    frame.render_widget(Paragraph::new(mark), sub(logo_area, lx, 0, 16, 8));
+    let word: Vec<Line> = WORDMARK
         .iter()
-        .position(|&t| t == app.active_tab)
-        .unwrap_or(0);
+        .map(|l| Line::from(Span::styled(*l, theme::fg(theme::PRIMARY))))
+        .collect();
+    frame.render_widget(
+        Paragraph::new(word),
+        sub(logo_area, lx + 16 + 3, 1, wm_w, 5),
+    );
 
-    let tabs = Tabs::new(titles)
-        .select(selected_tab_index)
-        .style(Style::default().fg(Color::DarkGray))
-        .highlight_style(
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD)
-                .add_modifier(Modifier::UNDERLINED),
-        )
-        .divider(Span::raw("|"));
+    let bw = ((area.width as u32 * 40 / 100) as u16)
+        .max(48)
+        .min(area.width);
+    let bx = area.width.saturating_sub(bw) / 2;
+    let by = top + 8 + 3;
+    draw_input_header(frame, sub(area, bx, by, bw, 1), app);
+    draw_composer(
+        frame,
+        sub(area, bx, by + 1, bw, 3),
+        app,
+        "ask a finance question, or type / for commands",
+    );
+}
 
-    frame.render_widget(tabs, area);
+fn draw_workspace(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    let area = pad(area, 1, 1, 1);
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(3),
+        ])
+        .split(area);
+    if app.active_tab == ActiveTab::AgentChat {
+        draw_chat_row(frame, rows[0], app);
+    } else {
+        draw_content(frame, rows[0], app);
+    }
+    draw_input_header(frame, rows[2], app);
+    let placeholder = if app.active_tab == ActiveTab::AgentChat {
+        "ask a follow-up, or / for commands"
+    } else {
+        "press i to ask, / for commands"
+    };
+    draw_composer(frame, rows[3], app, placeholder);
+}
+
+fn draw_chat_row(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    if area.width >= 60 {
+        let rail_w = ((area.width as u32 * 20 / 100) as u16).max(24);
+        let cols = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Min(0),
+                Constraint::Length(1),
+                Constraint::Length(rail_w),
+            ])
+            .split(area);
+        draw_transcript(frame, cols[0], app);
+        draw_rail(frame, cols[2], app);
+    } else {
+        draw_transcript(frame, area, app);
+    }
+}
+
+fn draw_transcript(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    let block = theme::panel_block("Tantra", theme::PRIMARY);
+    let inner = pad(block.inner(area), 1, 1, 1);
+    frame.render_widget(block, area);
+
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    let last = app.chat.len().saturating_sub(1);
+    for (i, msg) in app.chat.messages.iter().enumerate() {
+        if i > 0 {
+            lines.push(Line::from(""));
+        }
+        let loading = app.is_loading && i == last;
+        lines.extend(message_lines(msg, app.tick, loading));
+    }
+    let w = inner.width.max(1) as usize;
+    let total: usize = lines.iter().map(|l| (l.width().max(1)).div_ceil(w)).sum();
+    let visible = inner.height as usize;
+    let scroll_y = total.saturating_sub(visible).min(u16::MAX as usize) as u16;
+    frame.render_widget(
+        Paragraph::new(lines)
+            .scroll((scroll_y, 0))
+            .wrap(Wrap { trim: false }),
+        inner,
+    );
+}
+
+fn draw_rail(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    let block = theme::panel_block(
+        &format!("Market ({})", app.live.watchlist.len()),
+        theme::ACCENT,
+    )
+    .style(Style::default().bg(theme::BACKGROUND_PANEL));
+    let inner = pad(block.inner(area), 1, 1, 1);
+    frame.render_widget(block, area);
+
+    let foot_h: u16 = if inner.height > 6 { 4 } else { 0 };
+    let body = sub(
+        inner,
+        0,
+        0,
+        inner.width,
+        inner.height.saturating_sub(foot_h),
+    );
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    if app.live.watchlist.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "no market data yet",
+            theme::fg(theme::TEXT_MUTED),
+        )));
+    } else {
+        for row in &app.live.watchlist {
+            let color = if row.change >= Decimal::ZERO {
+                theme::SUCCESS
+            } else {
+                theme::ERROR
+            };
+            lines.push(Line::from(Span::styled(
+                row.symbol.clone(),
+                theme::fg(theme::TEXT),
+            )));
+            lines.push(Line::from(vec![
+                Span::styled(row.last.to_string(), theme::fg(theme::TEXT)),
+                Span::raw("  "),
+                Span::styled(
+                    format!("{:+}%", row.change_pct.round_dp(2)),
+                    theme::fg(color),
+                ),
+            ]));
+            lines.push(Line::from(""));
+        }
+    }
+    frame.render_widget(Paragraph::new(lines), body);
+
+    if foot_h > 0 {
+        let fy = inner.height - foot_h;
+        let foot = vec![
+            Line::from(Span::styled(
+                "─".repeat(inner.width as usize),
+                theme::fg(theme::BORDER),
+            )),
+            Line::from(Span::styled(
+                format!("{} messages", app.chat.len()),
+                theme::fg(theme::TEXT_MUTED),
+            )),
+            Line::from(Span::styled(
+                format!(
+                    "auto-approve {}",
+                    if app.auto_approve { "on" } else { "off" }
+                ),
+                theme::fg(theme::TEXT_MUTED),
+            )),
+            Line::from(Span::styled(
+                format!(
+                    "backend {}",
+                    if app.live.connected {
+                        "connected"
+                    } else {
+                        "offline"
+                    }
+                ),
+                theme::fg(theme::TEXT_MUTED),
+            )),
+        ];
+        frame.render_widget(Paragraph::new(foot), sub(inner, 0, fy, inner.width, foot_h));
+    }
+}
+
+fn draw_input_header(frame: &mut Frame, area: Rect, app: &TuiApp) {
+    let area = pad(area, 1, 1, 0);
+    let view_color = match app.active_tab {
+        ActiveTab::AgentChat => theme::PRIMARY,
+        ActiveTab::Watchlist | ActiveTab::Screener => theme::INFO,
+        ActiveTab::Portfolio | ActiveTab::Orders => theme::WARNING,
+        ActiveTab::Backtest | ActiveTab::Algos | ActiveTab::StrategyLab => theme::ACCENT,
+    };
+    let name = app.active_tab.title().to_lowercase();
+    let left_len = name.chars().count() + " (tab to cycle)".len();
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled(name, theme::fg(view_color)),
+            Span::styled(" (tab to cycle)", theme::fg(theme::TEXT_MUTED)),
+        ])),
+        area,
+    );
+    let avail = (area.width as usize).saturating_sub(left_len + 1 + "model: ".len());
+    if avail > 0 {
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled("model: ", theme::fg(theme::TEXT_MUTED)),
+                Span::styled(truncate(&app.model_name, avail), theme::fg(theme::TEXT)),
+            ]))
+            .alignment(Alignment::Right),
+            area,
+        );
+    }
+}
+
+fn draw_composer(frame: &mut Frame, area: Rect, app: &TuiApp, placeholder: &str) {
+    let block = theme::field_block(app.is_input_mode);
+    let inner = pad(block.inner(area), 1, 1, 0);
+    frame.render_widget(block, area);
+    let line = if app.input_buffer.is_empty() {
+        let ph = if app.is_input_mode {
+            placeholder
+        } else {
+            "press i to ask, / for commands"
+        };
+        Line::from(Span::styled(ph.to_string(), theme::fg(theme::TEXT_MUTED)))
+    } else {
+        let mut spans = vec![Span::styled(
+            app.input_buffer.clone(),
+            theme::fg(theme::TEXT),
+        )];
+        if app.is_input_mode {
+            spans.push(Span::styled("▋", theme::fg(theme::TEXT_MUTED)));
+        }
+        Line::from(spans)
+    };
+    frame.render_widget(Paragraph::new(line), inner);
+}
+
+fn draw_footer(frame: &mut Frame, area: Rect) {
+    let area = pad(area, 2, 2, 0);
+    let key = |k: &'static str| Span::styled(k, theme::fg(theme::ACCENT));
+    let muted = |t: &'static str| Span::styled(t, theme::fg(theme::TEXT_MUTED));
+    frame.render_widget(
+        Paragraph::new(Line::from(vec![
+            key("/"),
+            muted(" commands"),
+            Span::raw("  "),
+            key("^N"),
+            muted(" new"),
+            Span::raw("  "),
+            key("^C"),
+            muted(" quit"),
+        ])),
+        area,
+    );
+    frame.render_widget(
+        Paragraph::new(Line::from(muted_owned(format!(
+            "v{}",
+            env!("CARGO_PKG_VERSION")
+        ))))
+        .alignment(Alignment::Right),
+        area,
+    );
+}
+
+fn muted_owned(s: String) -> Span<'static> {
+    Span::styled(s, theme::fg(theme::TEXT_MUTED))
 }
 
 fn draw_content(frame: &mut Frame, area: Rect, app: &TuiApp) {
@@ -182,140 +464,147 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &TuiApp) {
         ActiveTab::Orders => draw_orders(frame, area, app),
         ActiveTab::Backtest => draw_backtest(frame, area, app),
         ActiveTab::Algos => draw_algos(frame, area, app),
-        ActiveTab::AgentChat => draw_agent_chat(frame, area, app),
+        ActiveTab::AgentChat => draw_chat_row(frame, area, app),
         ActiveTab::StrategyLab => crate::strategy_lab::draw_strategy_lab(frame, area, app),
     }
 }
 
-fn draw_agent_chat(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Min(3), Constraint::Length(3)])
-        .split(area);
-
-    let transcript_area = chunks[0];
-    let input_area = chunks[1];
-
-    // Transcript Box
-    let transcript_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::DarkGray))
-        .title(" Quantcept Research Desk (Live LLM Stream) ");
-
-    let mut lines = Vec::new();
-    for msg in &app.chat.messages {
-        lines.extend(message_to_lines(msg));
-    }
-
-    let visible_height = transcript_area.height.saturating_sub(2) as usize;
-    let total_lines = lines.len();
-    let scroll_y = if total_lines > visible_height {
-        (total_lines - visible_height) as u16
-    } else {
-        0
-    };
-
-    let transcript_p = Paragraph::new(lines)
-        .block(transcript_block)
-        .scroll((scroll_y, 0))
-        .wrap(Wrap { trim: false });
-    frame.render_widget(transcript_p, transcript_area);
-
-    // Input Box
-    let input_border_color = if app.is_input_mode {
-        Color::Cyan
-    } else {
-        Color::DarkGray
-    };
-    let input_title = if app.is_input_mode {
-        " Prompt (Enter: Send, Esc: Normal mode, '/' or Ctrl+P: Palette) "
-    } else {
-        " Prompt (Press 'i' or Enter to type, '/' or Ctrl+P: Palette) "
-    };
-
-    let input_block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(input_border_color))
-        .title(input_title);
-
-    let input_text = if app.is_input_mode {
-        format!("> {}▋", app.input_buffer)
-    } else if app.input_buffer.is_empty() {
-        "> [Press 'i' to type prompt, '/' or Ctrl+P for slash commands...]".to_string()
-    } else {
-        format!("> {}", app.input_buffer)
-    };
-
-    let input_style = if app.is_input_mode {
-        Style::default().fg(Color::White)
-    } else {
-        Style::default().fg(Color::DarkGray)
-    };
-
-    let input_p = Paragraph::new(input_text)
-        .block(input_block)
-        .style(input_style);
-    frame.render_widget(input_p, input_area);
-}
-
 fn draw_palette(frame: &mut Frame, area: Rect, app: &TuiApp) {
-    let popup_width = 72.min(area.width.saturating_sub(4));
-    let popup_height = 18.min(area.height.saturating_sub(4));
+    let groups = app.palette_groups();
+    let list_rows: usize = groups
+        .iter()
+        .map(|(_, r)| r.len() + 1)
+        .sum::<usize>()
+        .max(1);
+    let content_h = (2 + 2 + 3 + 1 + list_rows + 1 + 1) as u16;
+    let mw = 56.min(area.width.saturating_sub(4));
+    let mh = content_h.min(area.height.saturating_sub(4));
+    let modal = Rect::new(
+        area.x + area.width.saturating_sub(mw) / 2,
+        area.y + area.height.saturating_sub(mh) / 2,
+        mw,
+        mh,
+    );
 
-    let x = (area.width.saturating_sub(popup_width)) / 2;
-    let y = (area.height.saturating_sub(popup_height)) / 2;
-    let popup_area = Rect::new(x, y, popup_width, popup_height);
-
-    frame.render_widget(Clear, popup_area);
-
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(Color::Cyan))
-        .title(" Command Palette ([Enter] Run  [Tab] Complete  [Esc] Dismiss  [Up/Down] Move) ");
-
-    let filtered = app.filtered_palette();
-    let mut items = Vec::new();
-
-    items.push(Line::from(vec![
-        Span::styled("> ", Style::default().fg(Color::Cyan)),
-        Span::styled(&app.palette_query, Style::default().fg(Color::White)),
-        Span::styled("▋", Style::default().fg(Color::DarkGray)),
-    ]));
-    items.push(Line::from(
-        "─".repeat(popup_width.saturating_sub(2) as usize),
-    ));
-
-    if filtered.is_empty() {
-        items.push(Line::from("  No matching slash commands found."));
-    } else {
-        for (idx, (cmd, desc)) in filtered.iter().enumerate() {
-            let is_sel = idx == app.palette_selected;
-            let style = if is_sel {
-                Style::default()
-                    .fg(Color::Black)
-                    .bg(Color::Cyan)
-                    .add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::White)
-            };
-
-            let prefix = if is_sel { "▶ " } else { "  " };
-            items.push(Line::from(vec![
-                Span::styled(format!("{prefix}{:<15} ", cmd), style),
-                Span::styled(
-                    *desc,
-                    if is_sel {
-                        style
-                    } else {
-                        Style::default().fg(Color::DarkGray)
-                    },
-                ),
-            ]));
+    // Dim the backdrop.
+    {
+        let buf = frame.buffer_mut();
+        for y in area.top()..area.bottom() {
+            for x in area.left()..area.right() {
+                if x >= modal.left() && x < modal.right() && y >= modal.top() && y < modal.bottom()
+                {
+                    continue;
+                }
+                let cell = &mut buf[(x, y)];
+                cell.bg = Color::Rgb(0, 0, 0);
+                cell.fg = theme::dim_color(cell.fg);
+            }
         }
     }
 
-    let p = Paragraph::new(items).block(block);
-    frame.render_widget(p, popup_area);
+    frame.render_widget(Clear, modal);
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(theme::fg(theme::PRIMARY))
+        .title(Line::from(Span::styled(
+            "─Commands",
+            theme::bold(theme::PRIMARY),
+        )))
+        .style(Style::default().bg(theme::BACKGROUND_PANEL));
+    let inner = pad(block.inner(modal), 2, 2, 1);
+    frame.render_widget(block, modal);
+    if inner.height < 6 {
+        return;
+    }
+
+    // Field.
+    let field_area = sub(inner, 0, 0, inner.width, 3);
+    let fblock = theme::field_block(true).style(Style::default().bg(theme::BACKGROUND_PANEL));
+    let finner = pad(fblock.inner(field_area), 1, 1, 0);
+    frame.render_widget(fblock, field_area);
+    let q = app.palette_query.as_str();
+    let field_line = if q.is_empty() || q == "/" {
+        Line::from(Span::styled(
+            "type to filter…",
+            Style::default().fg(theme::PLACEHOLDER),
+        ))
+    } else {
+        Line::from(Span::styled(q.to_string(), theme::fg(theme::TEXT)))
+    };
+    frame.render_widget(Paragraph::new(field_line), finner);
+
+    // List.
+    let list_h = inner.height.saturating_sub(3 + 1 + 1 + 1) as usize;
+    let w = inner.width as usize;
+    let selected_cmd = app
+        .filtered_palette()
+        .get(app.palette_selected)
+        .map(|(c, _)| *c);
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    let mut sel_line = 0usize;
+    if groups.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "  no matching commands",
+            theme::fg(theme::TEXT_MUTED),
+        )));
+    }
+    for (group, rows) in &groups {
+        let group_selected = rows.iter().any(|(c, _)| Some(*c) == selected_cmd);
+        lines.push(Line::from(Span::styled(
+            group.to_string(),
+            if group_selected {
+                theme::bold(theme::ACCENT)
+            } else {
+                theme::fg(theme::ACCENT)
+            },
+        )));
+        for (cmd, desc) in rows {
+            let is_sel = Some(*cmd) == selected_cmd;
+            let left = format!("  {cmd}");
+            let avail = w.saturating_sub(left.chars().count() + 1);
+            let d = if avail > 1 {
+                truncate(desc, avail)
+            } else {
+                String::new()
+            };
+            let gap = w.saturating_sub(left.chars().count() + d.chars().count());
+            let text = format!("{left}{}{d}", " ".repeat(gap));
+            if is_sel {
+                sel_line = lines.len();
+                lines.push(Line::from(Span::styled(
+                    text,
+                    Style::default().fg(theme::BACKGROUND).bg(theme::PRIMARY),
+                )));
+            } else {
+                lines.push(Line::from(vec![
+                    Span::styled(left.clone(), theme::fg(theme::TEXT)),
+                    Span::styled(
+                        format!("{}{d}", " ".repeat(gap)),
+                        theme::fg(theme::TEXT_MUTED),
+                    ),
+                ]));
+            }
+        }
+    }
+    let offset = if list_h > 0 && sel_line >= list_h {
+        sel_line + 1 - list_h
+    } else {
+        0
+    };
+    let visible: Vec<Line<'static>> = lines.into_iter().skip(offset).take(list_h).collect();
+    frame.render_widget(
+        Paragraph::new(visible),
+        sub(inner, 0, 4, inner.width, list_h as u16),
+    );
+    let hy = 4 + list_h as u16 + 1;
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            "↑↓ move / enter run / tab complete / esc close",
+            theme::fg(theme::TEXT_MUTED),
+        ))),
+        sub(inner, 0, hy, inner.width, 1),
+    );
 }
 
 fn draw_watchlist(frame: &mut Frame, area: Rect, app: &TuiApp) {
@@ -595,26 +884,6 @@ fn draw_orders(frame: &mut Frame, area: Rect, app: &TuiApp) {
 
     let table = Table::new(rows, widths).header(header).block(block);
     frame.render_widget(table, area);
-}
-
-fn draw_footer(frame: &mut Frame, area: Rect, _app: &TuiApp) {
-    let footer_text = Line::from(vec![
-        Span::styled(" [Tab / 1-8] ", Style::default().fg(Color::Yellow)),
-        Span::raw("Tabs | "),
-        Span::styled("[/ or Ctrl+P] ", Style::default().fg(Color::Magenta)),
-        Span::raw("Palette | "),
-        Span::styled("[i / Enter] ", Style::default().fg(Color::Yellow)),
-        Span::raw("Chat Input | "),
-        Span::styled("[Esc] ", Style::default().fg(Color::Yellow)),
-        Span::raw("Normal Mode | "),
-        Span::styled("[q] ", Style::default().fg(Color::Yellow)),
-        Span::raw("Quit"),
-    ]);
-
-    let p = Paragraph::new(footer_text)
-        .style(Style::default().fg(Color::DarkGray))
-        .alignment(Alignment::Center);
-    frame.render_widget(p, area);
 }
 
 fn draw_algos(frame: &mut Frame, area: Rect, app: &TuiApp) {

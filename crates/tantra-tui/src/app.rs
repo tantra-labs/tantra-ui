@@ -327,6 +327,83 @@ pub const SLASH_COMMANDS: &[(&str, &str)] = &[
     ("/exit", "Exit the workstation cleanly"),
 ];
 
+/// Palette command groups, in display order. Commands not listed fall into "Other".
+pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
+    (
+        "Session",
+        &[
+            "/new",
+            "/resume",
+            "/clear",
+            "/copy",
+            "/export",
+            "/undo",
+            "/redo",
+            "/checkpoints",
+            "/context",
+            "/usage",
+        ],
+    ),
+    (
+        "Strategy",
+        &[
+            "/ee-study",
+            "/loop-eval",
+            "/loop-sweep",
+            "/hedge",
+            "/backtest",
+            "/tune",
+            "/suggest",
+            "/verify",
+            "/positions",
+        ],
+    ),
+    (
+        "Agent",
+        &[
+            "/agent",
+            "/unbind",
+            "/create-agent",
+            "/delete-agent",
+            "/remember",
+            "/memory",
+            "/knowledge",
+            "/learnings",
+            "/skills",
+            "/jobs",
+            "/auto",
+        ],
+    ),
+    (
+        "Reference",
+        &[
+            "/help",
+            "/mcp",
+            "/plugins",
+            "/marketplace",
+            "/artifacts",
+            "/workspaces",
+            "/cloud",
+            "/computer-use",
+            "/buddy",
+        ],
+    ),
+    (
+        "App",
+        &[
+            "/theme",
+            "/perf",
+            "/settings",
+            "/account",
+            "/upgrade",
+            "/billing",
+            "/logout",
+            "/quit",
+            "/exit",
+        ],
+    ),
+];
+
 /// The terminal application state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TuiApp {
@@ -379,18 +456,14 @@ pub struct TuiApp {
     pub ee_positions: Vec<PositionIntent>,
     /// Interactive Strategy Lab / Chart state (Track T21.4).
     pub strategy_lab: StrategyLabState,
+    /// Animation tick counter (spinner).
+    pub tick: u64,
 }
 
 impl TuiApp {
     /// Create a new TUI app starting on the watchlist dashboard.
     pub fn new() -> Self {
-        let mut chat = ChatTranscript::new();
-        chat.push(AgentMessage::new(
-            AgentRole::Agent,
-            "Namaste! I am Tantra Agent, your local in-process AI trading workstation powered by Llama-3.2-3B (Candle GGUF).\n\
-Ask me anything about market microstructure, order books, technical strategies, risk management, or Indian equities (NSE/BSE).\n\
-Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands.",
-        ));
+        let chat = ChatTranscript::new();
 
         let discovered = StrategyBridge::discover_strategies();
         let mut algos = Vec::new();
@@ -450,13 +523,13 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
         }
 
         Self {
-            active_tab: ActiveTab::Watchlist,
+            active_tab: ActiveTab::AgentChat,
             should_quit: false,
             live: LiveData::new(),
             chat,
             selected_index: 0,
             input_buffer: String::new(),
-            is_input_mode: false,
+            is_input_mode: true,
             is_loading: false,
             model_name: "Llama-3.2-3B-Instruct (Candle GGUF)".to_string(),
             pending_prompt: None,
@@ -474,6 +547,7 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
             trade_suggestion,
             ee_positions: ee_seed_positions(),
             strategy_lab: StrategyLabState::new(),
+            tick: 0,
         }
     }
 
@@ -497,20 +571,72 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
         self
     }
 
-    /// Filtered slash commands matching current palette query.
-    pub fn filtered_palette(&self) -> Vec<(&'static str, &'static str)> {
+    /// Filtered slash commands matching the current palette query, grouped.
+    pub fn palette_groups(&self) -> Vec<(&'static str, Vec<(&'static str, &'static str)>)> {
         let q = self.palette_query.to_lowercase();
         let stripped = q.trim_start_matches('/');
-        SLASH_COMMANDS
+        let matches = |cmd: &str, desc: &str| {
+            let cmd_clean = cmd.trim_start_matches('/');
+            cmd.contains(&q)
+                || cmd_clean.contains(stripped)
+                || desc.to_lowercase().contains(stripped)
+        };
+        let mut out: Vec<(&'static str, Vec<(&'static str, &'static str)>)> = Vec::new();
+        for (group, cmds) in COMMAND_GROUPS {
+            let rows: Vec<_> = SLASH_COMMANDS
+                .iter()
+                .copied()
+                .filter(|(c, d)| cmds.contains(c) && matches(c, d))
+                .collect();
+            if !rows.is_empty() {
+                out.push((group, rows));
+            }
+        }
+        let other: Vec<_> = SLASH_COMMANDS
             .iter()
             .copied()
-            .filter(|(cmd, desc)| {
-                let cmd_clean = cmd.trim_start_matches('/');
-                cmd.contains(&q)
-                    || cmd_clean.contains(stripped)
-                    || desc.to_lowercase().contains(stripped)
+            .filter(|(c, d)| {
+                !COMMAND_GROUPS.iter().any(|(_, cmds)| cmds.contains(c)) && matches(c, d)
             })
+            .collect();
+        if !other.is_empty() {
+            out.push(("Other", other));
+        }
+        out
+    }
+
+    /// Flattened palette rows in drawn order (indexes match `palette_selected`).
+    pub fn filtered_palette(&self) -> Vec<(&'static str, &'static str)> {
+        self.palette_groups()
+            .into_iter()
+            .flat_map(|(_, rows)| rows)
             .collect()
+    }
+
+    /// Submit a prompt to the agent, switching to the Agent view.
+    pub fn submit_prompt(&mut self, prompt: String) {
+        self.active_tab = ActiveTab::AgentChat;
+        self.chat
+            .push(AgentMessage::new(AgentRole::User, prompt.clone()));
+        self.chat.push(AgentMessage::new(AgentRole::Agent, ""));
+        self.pending_prompt = Some(prompt);
+        self.is_loading = true;
+    }
+
+    fn start_new_session(&mut self) {
+        self.chat.clear();
+        self.input_buffer.clear();
+        self.is_loading = false;
+        self.pending_prompt = None;
+        self.active_tab = ActiveTab::AgentChat;
+        self.is_input_mode = true;
+        self.is_palette_open = false;
+        self.palette_query.clear();
+    }
+
+    fn set_tab(&mut self, tab: ActiveTab) {
+        self.active_tab = tab;
+        self.is_input_mode = tab == ActiveTab::AgentChat;
     }
 
     /// Execute a slash command locally without calling LLM.
@@ -1084,6 +1210,20 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
             return;
         }
 
+        if key.modifiers.contains(KeyModifiers::CONTROL) {
+            match key.code {
+                KeyCode::Char('c') => {
+                    self.should_quit = true;
+                    return;
+                }
+                KeyCode::Char('n') => {
+                    self.start_new_session();
+                    return;
+                }
+                _ => {}
+            }
+        }
+
         // Ctrl+P toggle command palette
         if key.code == KeyCode::Char('p') && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.is_palette_open = !self.is_palette_open;
@@ -1163,8 +1303,14 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
         }
 
         // Active chat input editing mode
-        if self.active_tab == ActiveTab::AgentChat && self.is_input_mode {
+        if self.is_input_mode {
             match key.code {
+                KeyCode::Tab => {
+                    self.set_tab(self.active_tab.next());
+                }
+                KeyCode::BackTab => {
+                    self.set_tab(self.active_tab.previous());
+                }
                 KeyCode::Esc => {
                     self.is_input_mode = false;
                 }
@@ -1177,11 +1323,7 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
                         if prompt.starts_with('/') {
                             self.execute_slash_command(&prompt);
                         } else {
-                            self.chat
-                                .push(AgentMessage::new(AgentRole::User, prompt.clone()));
-                            self.chat.push(AgentMessage::new(AgentRole::Agent, ""));
-                            self.pending_prompt = Some(prompt);
-                            self.is_loading = true;
+                            self.submit_prompt(prompt);
                         }
                     }
                 }
@@ -1348,13 +1490,13 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
         if let KeyCode::Char(c @ '1'..='8') = key.code {
             let idx = (c as u8 - b'1') as usize;
             if idx < ActiveTab::ALL.len() {
-                self.active_tab = ActiveTab::ALL[idx];
+                self.set_tab(ActiveTab::ALL[idx]);
                 return;
             }
         }
 
         // Quick enter to chat input when on Agent tab
-        if self.active_tab == ActiveTab::AgentChat && key.code == KeyCode::Char('i') {
+        if key.code == KeyCode::Char('i') {
             self.is_input_mode = true;
             return;
         }
@@ -1368,8 +1510,8 @@ Press 'i' or Enter to type a prompt. Type '/' or press Ctrl+P for slash commands
     pub fn apply(&mut self, action: Action) {
         match action {
             Action::Quit => self.should_quit = true,
-            Action::NextTab => self.active_tab = self.active_tab.next(),
-            Action::PreviousTab => self.active_tab = self.active_tab.previous(),
+            Action::NextTab => self.set_tab(self.active_tab.next()),
+            Action::PreviousTab => self.set_tab(self.active_tab.previous()),
             Action::Down | Action::Up => {
                 self.move_selection(action);
             }

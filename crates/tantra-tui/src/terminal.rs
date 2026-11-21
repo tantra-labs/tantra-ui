@@ -62,6 +62,7 @@ async fn run_loop(
     let (token_tx, mut token_rx) = mpsc::channel::<AgentStreamUpdate>(128);
 
     loop {
+        app.tick = app.tick.wrapping_add(1);
         terminal.draw(|frame| ui::draw(frame, app))?;
 
         if app.should_quit {

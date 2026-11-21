@@ -11,9 +11,11 @@ use tantra_tui::keybindings::{Action, handle_key};
 use tantra_tui::layout::LayoutModel;
 
 #[test]
-fn new_app_starts_on_watchlist() {
+fn new_app_starts_on_agent_chat() {
     let app = TuiApp::new();
-    assert_eq!(app.active_tab, ActiveTab::Watchlist);
+    assert_eq!(app.active_tab, ActiveTab::AgentChat);
+    assert!(app.chat.is_empty());
+    assert!(app.is_input_mode);
     assert!(!app.should_quit);
     assert_eq!(app.selected_index, 0);
 }
@@ -72,9 +74,11 @@ fn keybindings_map_chars_and_navigation() {
 fn app_apply_quit_and_tabs() {
     let mut app = TuiApp::new();
     app.apply(Action::NextTab);
-    assert_eq!(app.active_tab, ActiveTab::Screener);
-    app.apply(Action::PreviousTab);
+    assert_eq!(app.active_tab, ActiveTab::StrategyLab);
+    app.apply(Action::NextTab);
     assert_eq!(app.active_tab, ActiveTab::Watchlist);
+    app.apply(Action::PreviousTab);
+    assert_eq!(app.active_tab, ActiveTab::StrategyLab);
     app.apply(Action::Quit);
     assert!(app.should_quit);
 }
@@ -107,11 +111,9 @@ fn chat_transcript_appends_and_highlights() {
 fn layout_model_splits_regions() {
     let area = ratatui::layout::Rect::new(0, 0, 100, 30);
     let layout = LayoutModel::new(area);
-    assert_eq!(layout.header.height, 1);
-    assert_eq!(layout.tabs.height, 1);
     assert_eq!(layout.footer.height, 1);
-    assert_eq!(layout.content.height, 27);
-    assert_eq!(layout.content.width, 100);
+    assert_eq!(layout.main.height, 28);
+    assert_eq!(layout.main.width, 100);
 }
 
 #[test]
@@ -309,7 +311,7 @@ fn test_command_palette_modal_and_filtering() {
         for x in 0..80 {
             row.push_str(terminal.backend().buffer()[(x, y)].symbol());
         }
-        if row.contains("Command Palette") {
+        if row.contains("Commands") {
             found_palette = true;
             break;
         }
@@ -322,6 +324,12 @@ fn test_palette_tab_autocomplete() {
     let mut app = TuiApp::new();
     app.is_palette_open = true;
     app.palette_query = "agent".to_string();
+    // Palette rows are grouped, so select "/agent" by its drawn position.
+    app.palette_selected = app
+        .filtered_palette()
+        .iter()
+        .position(|(c, _)| *c == "/agent")
+        .unwrap();
 
     let tab_key = KeyEvent {
         code: KeyCode::Tab,
@@ -376,6 +384,7 @@ fn test_algos_tab_state_and_render() {
     let mut terminal = Terminal::new(backend).unwrap();
     let mut app = TuiApp::new();
     app.active_tab = ActiveTab::Algos;
+    app.is_input_mode = false;
 
     assert!(app.algos.len() >= 4);
     assert_eq!(app.selected_algo_index, 0);
@@ -463,6 +472,7 @@ fn test_slash_commands_phase3_workflow() {
 fn test_interactive_hotkeys_algos_to_backtest() {
     let mut app = TuiApp::new();
     app.active_tab = ActiveTab::Algos;
+    app.is_input_mode = false;
 
     // Press Enter to backtest selected
     let key_enter = KeyEvent {
