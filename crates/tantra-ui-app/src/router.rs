@@ -22,7 +22,7 @@ pub enum AppRoute {
     Portfolio,
     /// Algo / strategy management.
     Algos,
-    /// Paper trading panel (embedded in-browser engine or `/ws/live` server).
+    /// Paper trading panel (embedded in-browser engine or `/api/v2/stream` server).
     Paper,
 }
 

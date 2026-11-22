@@ -373,7 +373,7 @@ fn AlgosView() -> impl IntoView {
 
 /// Paper trading panel: order ticket + working orders / fills / depth /
 /// positions over the in-browser `PaperSession` (embedded mode) or a
-/// `/ws/live` server (plan 0008 D2). "Run demo tape" drives the real engine
+/// `/api/v2/stream` server (plan 0008 D2). "Run demo tape" drives the real engine
 /// deterministically.
 #[component]
 fn PaperView() -> impl IntoView {

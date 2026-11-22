@@ -58,7 +58,7 @@ pub enum PaperMode {
     /// In-process `PaperExchange` engine (deterministic, offline).
     #[default]
     Embedded,
-    /// Thin client of a `tantra paper serve` REST + `/ws/live` server.
+    /// Thin client of a `tantra paper serve` `/api/v2` REST + `/api/v2/stream` server.
     Server,
 }
 

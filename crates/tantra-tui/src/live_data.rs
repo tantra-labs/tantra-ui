@@ -531,7 +531,7 @@ impl Default for LiveData {
     }
 }
 
-/// The offline paper-panel fixture shown until `/ws/live` paper events arrive
+/// The offline paper-panel fixture shown until `/api/v2/stream` paper events arrive
 /// (plan 0008 D3 keeps the previous hardcoded fixture as the offline
 /// fallback; the live render replaces it once the stream delivers data).
 pub const PAPER_PANEL_FIXTURE: &str = "Paper Trading Positions:\n  • NIFTY 24500 CE  (100 qty)  LTP: ₹142.50  PnL: +₹3,200 (+2.3%)\n  • RELIANCE        (50 qty)   LTP: ₹2,980.10 PnL: -₹450 (-0.3%)\n  Total MTM: +₹2,750 (Pre-trade margin validated, SEBI risk limits OK)\n  Modal keys: Enter opens positions or order log.";
@@ -546,7 +546,7 @@ pub fn paper_panel_text(live: &LiveData) -> String {
         return PAPER_PANEL_FIXTURE.to_string();
     }
 
-    let mut out = String::from("Paper Trading Positions (live /ws/live):\n");
+    let mut out = String::from("Paper Trading Positions (live /api/v2/stream):\n");
     if !live.paper_orders.is_empty() {
         out.push_str("Working orders:\n");
         for o in &live.paper_orders {

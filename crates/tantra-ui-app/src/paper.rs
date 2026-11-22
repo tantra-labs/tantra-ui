@@ -6,7 +6,7 @@
 //! Two modes:
 //! - **Embedded**: drives a [`tantra_ui_api_wasm::paper::PaperSession`] — the
 //!   real WASM-portable matching engine, fully offline and deterministic.
-//! - **Server**: projects the same `/ws/live` `ClientEvent` stream the TUI
+//! - **Server**: projects the same `/api/v2/stream` paper events the TUI
 //!   consumes (fills / positions / working orders from a paper server).
 
 use rust_decimal::Decimal;
@@ -23,7 +23,7 @@ use uuid::Uuid;
 pub enum PaperMode {
     /// In-browser `PaperSession` (offline, deterministic).
     Embedded,
-    /// A `tantra-runtime-api-rest` paper server (`/orders` + `/ws/live`).
+    /// A `tantra-runtime-api-rest` paper server (`/api/v2/orders` + `/api/v2/stream`).
     Server,
 }
 

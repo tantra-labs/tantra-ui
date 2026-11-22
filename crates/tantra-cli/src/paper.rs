@@ -7,7 +7,7 @@
 //! reads the wall clock; every transition takes an explicit `DateTime<Utc>`.
 //!
 //! `--mode server` is a thin client: it prints instructions pointing at a
-//! `tantra paper serve` instance's REST `/orders` + `/ws/live` stream.
+//! `tantra paper serve` instance's `/api/v2/orders` REST + `/api/v2/stream` socket.
 
 use chrono::{Duration, TimeZone, Utc};
 use rust_decimal::Decimal;
@@ -90,18 +90,20 @@ pub fn run_embedded_report(cash: Decimal, seed: Option<u64>) -> String {
 }
 
 /// Print server-mode instructions pointing at a `tantra paper serve`
-/// instance's REST `/orders` + `/ws/live` stream (thin client, no auth).
+/// instance's `/api/v2/orders` REST + `/api/v2/stream` socket (design 0006).
+/// Both need a bearer token with the `trade` scope once auth is enabled.
 pub fn run_server_instructions(server: Option<&str>) -> String {
     let base = server.unwrap_or("http://127.0.0.1:8000");
     let ws_base = base
         .trim_start_matches("http://")
         .trim_start_matches("https://");
     format!(
-        "Paper server mode — point the workstation at a paper server instance (thin client, no auth):\n\
-         REST:    POST {base}/orders\n\
-                  GET  {base}/orders\n\
-                  DELETE {base}/orders/{{id}}\n\
-         Stream:  ws://{ws_base}/ws/live  (fills, positions, working orders)\n\
+        "Paper server mode — point the workstation at a paper server instance (thin client; send\n\
+         `Authorization: Bearer <token>` with the `trade` scope when auth is enabled):\n\
+         REST:    POST {base}/api/v2/orders\n\
+                  GET  {base}/api/v2/orders\n\
+                  POST {base}/api/v2/orders/{{id}}/cancel\n\
+         Stream:  ws://{ws_base}/api/v2/stream  (subscribe orders / fills / portfolio)\n\
          Start:   `tantra serve <data_dir> --addr 127.0.0.1:8000` in paper mode."
     )
 }

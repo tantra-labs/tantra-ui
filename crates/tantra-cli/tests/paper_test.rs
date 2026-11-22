@@ -52,14 +52,16 @@ fn two_identical_runs_produce_identical_output() {
     assert_eq!(body_a, body_c, "fill/equity content is seed-independent");
 }
 
-/// Server mode prints thin-client instructions pointing at the REST `/orders`
-/// and `/ws/live` endpoints.
+/// Server mode prints thin-client instructions pointing at the canonical
+/// `/api/v2/orders` and `/api/v2/stream` endpoints (design 0006).
 #[test]
 fn server_mode_prints_instructions() {
     let msg = run_server_instructions(Some("http://127.0.0.1:8000"));
-    assert!(msg.contains("/orders"), "msg:\n{msg}");
-    assert!(msg.contains("/ws/live"), "msg:\n{msg}");
-    assert!(msg.contains("no auth"), "msg:\n{msg}");
+    assert!(msg.contains("/api/v2/orders"), "msg:\n{msg}");
+    assert!(msg.contains("/api/v2/orders/{id}/cancel"), "msg:\n{msg}");
+    assert!(msg.contains("/api/v2/stream"), "msg:\n{msg}");
+    assert!(!msg.contains("/ws/live"), "msg:\n{msg}");
+    assert!(msg.contains("Bearer"), "msg:\n{msg}");
 
     let default_msg = run_server_instructions(None);
     assert!(

@@ -1,6 +1,6 @@
-//! U4 — TUI paper panel on the `/ws/live` stream (plan 0008 D3).
+//! U4 — TUI paper panel on the `/api/v2/stream` socket (plan 0008 D3, design 0006).
 //!
-//! Feed a `/ws/live`-shaped batch of canonical `ClientEvent`s through the
+//! Feed a stream-shaped batch of canonical `ClientEvent`s through the
 //! pure `LiveData` fold and assert the rendered paper panel contains the
 //! working orders / fills / depth rows and positions + cash/equity. The
 //! offline fixture fallback renders only when no paper events have arrived.
@@ -29,7 +29,7 @@ fn ts() -> DateTime<Utc> {
     Utc.timestamp_opt(TS0, 0).unwrap()
 }
 
-/// A `/ws/live`-shaped paper batch: two acks, one fill, a quote (depth), and
+/// A stream-shaped paper batch: two acks, one fill, a quote (depth), and
 /// a portfolio snapshot (positions + cash/equity).
 fn paper_event_batch() -> Vec<ClientEvent> {
     let inst = reliance();
