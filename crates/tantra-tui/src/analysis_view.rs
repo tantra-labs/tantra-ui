@@ -369,6 +369,14 @@ pub(crate) fn tool_height(block: &DisplayBlock) -> u16 {
         DisplayBlock::OverlayScene { .. } => 4,
         DisplayBlock::Chart { .. } => 4,
         DisplayBlock::View { summary, .. } => summary.lines().count().min(8) + 3,
+        DisplayBlock::CodeDiff { code, hunks, .. } => {
+            let lines = if hunks.is_empty() {
+                code.lines().count()
+            } else {
+                hunks.iter().map(|hk| 1 + hk.lines.len()).sum()
+            };
+            lines.clamp(2, 10) + 3
+        }
         #[allow(unreachable_patterns)]
         _ => 4,
     };
@@ -380,7 +388,8 @@ fn block_label(block: &DisplayBlock) -> String {
         DisplayBlock::Table { title, .. }
         | DisplayBlock::Chart { title, .. }
         | DisplayBlock::OverlayScene { title, .. }
-        | DisplayBlock::View { title, .. } => title.clone(),
+        | DisplayBlock::View { title, .. }
+        | DisplayBlock::CodeDiff { title, .. } => title.clone(),
         DisplayBlock::MetricGrid { .. } => "metrics".to_string(),
         DisplayBlock::Alert { .. } => "alert".to_string(),
         #[allow(unreachable_patterns)]

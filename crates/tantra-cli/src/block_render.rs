@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 use rust_decimal::Decimal;
 use serde_json::Value;
-use tantra_agent_core::result::{DisplayBlock, MetricItem};
+use tantra_agent_core::result::{CodeDiffHunk, DisplayBlock, MetricItem};
 
 const BOLD: &str = "\x1b[1m";
 const RESET: &str = "\x1b[0m";
@@ -65,6 +65,12 @@ pub fn render_blocks(blocks: &[DisplayBlock]) -> String {
                     out.push_str(&format!("{}: {}\n", h.label, h.value));
                 }
             }
+            DisplayBlock::CodeDiff {
+                title,
+                lang,
+                code,
+                hunks,
+            } => out.push_str(&render_code_diff(title, lang, code, hunks)),
         }
         out.push('\n');
     }
@@ -189,6 +195,39 @@ fn render_overlay_scene(
     format!(
         "{BOLD}Scene{RESET} {title} [{symbol} {timeframe}] {counts}\n  (render in the TUI Strategy Lab or the web chart)\n"
     )
+}
+
+fn render_code_diff(title: &str, lang: &str, code: &str, hunks: &[CodeDiffHunk]) -> String {
+    let mut out = String::new();
+    let lang_label = if lang.is_empty() {
+        String::new()
+    } else {
+        format!(" ({lang})")
+    };
+    out.push_str(&format!("{BOLD}{title}{lang_label}{RESET}\n"));
+    if hunks.is_empty() {
+        if !code.is_empty() {
+            out.push_str(code);
+            if !code.ends_with('\n') {
+                out.push('\n');
+            }
+        }
+    } else {
+        for hunk in hunks {
+            out.push_str(&format!("{CYAN}{}{RESET}\n", hunk.header));
+            for line in &hunk.lines {
+                let color = if line.starts_with('+') {
+                    GREEN
+                } else if line.starts_with('-') {
+                    RED
+                } else {
+                    RESET
+                };
+                out.push_str(&format!("{color}{line}{RESET}\n"));
+            }
+        }
+    }
+    out
 }
 
 fn render_alert(level: &str, message: &str) -> String {

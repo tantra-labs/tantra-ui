@@ -2,7 +2,7 @@
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use tantra_agent_core::result::DisplayBlock;
+use tantra_agent_core::result::{CodeDiffHunk, DisplayBlock};
 use tantra_tui::result_block::ResultBlockWidget;
 
 #[test]
@@ -80,4 +80,38 @@ fn result_block_widget_summarises_overlay_scene() {
         "missing counts in: {text}"
     );
     assert!(text.contains("EE+ on NIFTY"), "missing title in: {text}");
+}
+
+#[test]
+fn result_block_widget_renders_code_diff() {
+    let block = DisplayBlock::CodeDiff {
+        title: "EMA Crossover v2".into(),
+        lang: "python".into(),
+        code: String::new(),
+        hunks: vec![CodeDiffHunk {
+            id: "hunk_1".into(),
+            header: "@@ -1,2 +1,2 @@".into(),
+            lines: vec!["-fast = 12".into(), "+fast = 9".into()],
+        }],
+    };
+    let backend = TestBackend::new(80, 10);
+    let mut terminal = Terminal::new(backend).expect("terminal");
+    terminal
+        .draw(|frame| {
+            frame.render_widget(ResultBlockWidget { block: &block }, frame.area());
+        })
+        .expect("draw");
+    let text: String = terminal
+        .backend()
+        .buffer()
+        .content()
+        .iter()
+        .map(|c| c.symbol())
+        .collect();
+    assert!(
+        text.contains("EMA Crossover v2"),
+        "missing title in: {text}"
+    );
+    assert!(text.contains("[python]"), "missing lang badge in: {text}");
+    assert!(text.contains("+fast = 9"), "missing hunk line in: {text}");
 }

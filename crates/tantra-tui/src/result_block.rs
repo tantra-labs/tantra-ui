@@ -111,6 +111,47 @@ impl<'a> Widget for ResultBlockWidget<'a> {
                     .block(theme::panel_block(title.as_str(), theme::ACCENT));
                 Widget::render(paragraph, area, buf);
             }
+            DisplayBlock::CodeDiff {
+                title,
+                lang,
+                code,
+                hunks,
+            } => {
+                let mut lines = Vec::new();
+                if !lang.is_empty() {
+                    lines.push(Line::from(Span::styled(
+                        format!("[{lang}]"),
+                        theme::bold(theme::ACCENT),
+                    )));
+                }
+                if hunks.is_empty() {
+                    lines.extend(code.lines().map(|l| Line::from(l.to_string())));
+                } else {
+                    for hunk in hunks {
+                        lines.push(Line::from(Span::styled(
+                            hunk.header.clone(),
+                            Style::default().fg(theme::INFO),
+                        )));
+                        for line in &hunk.lines {
+                            let color = if line.starts_with('+') {
+                                theme::SUCCESS
+                            } else if line.starts_with('-') {
+                                theme::ERROR
+                            } else {
+                                theme::TEXT
+                            };
+                            lines.push(Line::from(Span::styled(
+                                line.clone(),
+                                Style::default().fg(color),
+                            )));
+                        }
+                    }
+                }
+                let paragraph = Paragraph::new(lines)
+                    .wrap(ratatui::widgets::Wrap { trim: false })
+                    .block(theme::panel_block(title.as_str(), theme::ACCENT));
+                Widget::render(paragraph, area, buf);
+            }
         }
     }
 }
