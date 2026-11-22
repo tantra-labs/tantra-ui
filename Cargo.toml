@@ -43,6 +43,7 @@ tantra-agent-prompt = { path = "../tantra-agent/crates/tantra-agent-prompt" }
 tantra-runtime-jobs = { path = "../tantra-runtime/crates/tantra-runtime-jobs" }
 tantra-runtime-api = { path = "../tantra-runtime/crates/tantra-runtime-api" }
 tantra-runtime-api-rest = { path = "../tantra-runtime/crates/tantra-runtime-api-rest" }
+tantra-runtime-client = { path = "../tantra-runtime/crates/tantra-runtime-client" }
 tantra-ui-core = { path = "crates/tantra-ui-core" }
 tantra-ui-assets = { path = "crates/tantra-ui-assets" }
 tantra-ui-charts = { path = "crates/tantra-ui-charts" }

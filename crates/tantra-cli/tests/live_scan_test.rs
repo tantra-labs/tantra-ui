@@ -1,4 +1,4 @@
-//! Live `GET /screener/scan` path for `tantra scan --server` (T10.4, gap ui 0006).
+//! Live `GET /api/v2/screener/scans` path for `tantra scan --server` (T10.4, gap ui 0006).
 //!
 //! Boots a real `tantra-runtime-api-rest` router over an in-memory daily-bar
 //! dataset on an ephemeral TCP port and drives the sync `live_scan` entry point

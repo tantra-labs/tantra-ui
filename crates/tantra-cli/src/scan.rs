@@ -2,13 +2,12 @@
 //!
 //! Parses the CLI query into a canonical [`tantra_core::screener::ScreenerScanRequest`].
 //! Two evaluation paths:
-//! - **Live** (`tantra scan --server <url>`): `GET /screener/scan` on a running
+//! - **Live** (`tantra scan --server <url>`): `GET /api/v2/screener/scans` on a running
 //!   `tantra-runtime-api-rest` server (T10.4, gap `ui 0006`).
 //! - **Offline fixture fallback** (no `--server`): the in-memory fixture universe
 //!   below, evaluated through [`tantra_ui_api_wasm::screener::apply_scan`].
 
 use std::collections::BTreeMap;
-use std::error::Error as _;
 use std::str::FromStr;
 
 use rust_decimal::Decimal;
@@ -18,6 +17,7 @@ use tantra_core::screener::{
 };
 use tantra_core::types::{Exchange, InstrumentId};
 use tantra_runtime_api::ScreenerQuery;
+use tantra_runtime_client::{BlockingRuntimeClient, ClientError};
 use tantra_ui_api_wasm::screener::apply_scan;
 
 use crate::args::ScanArgs;
@@ -214,19 +214,7 @@ pub fn to_server_filters(request: &ScreenerScanRequest) -> serde_json::Value {
     filter_group_to_server_json(&request.filters)
 }
 
-/// Render a `reqwest` error with its full source chain, so a transport failure
-/// names the actual cause (connect refused, timeout, TLS, ...).
-fn error_chain(err: &reqwest::Error) -> String {
-    let mut out = String::new();
-    let mut source = err.source();
-    while let Some(s) = source {
-        out.push_str(&format!(": {s}"));
-        source = s.source();
-    }
-    out
-}
-
-/// Run a screener scan against a live `GET /screener/scan` endpoint and return
+/// Run a screener scan against a live `GET /api/v2/screener/scans` endpoint and return
 /// the number of matching rows. `universe` holds `SYM.EXCH` or `EXCH:SYM`
 /// instrument ids; `tf`/`as_of` are optional wire overrides.
 pub fn live_scan(
@@ -246,45 +234,50 @@ pub fn live_scan(
         as_of: as_of.map(String::from),
     };
     let base = server.trim_end_matches('/');
-    let url = format!("{base}/screener/scan");
-    let resp = reqwest::blocking::Client::new()
-        .get(&url)
-        .query(&query)
-        .send()
-        .map_err(|e| {
+    let client = BlockingRuntimeClient::new(base, None)
+        .map_err(|e| CliError::Execution(format!("invalid screener server `{base}`: {e}")))?;
+    let data = client.screener_scans(&query).map_err(|e| match e {
+        ClientError::Unreachable(m) => {
+            CliError::Execution(format!("cannot reach screener server at {base}: {m}"))
+        }
+        ClientError::Http {
+            status,
+            code,
+            message,
+            reason,
+        } => {
+            let code = code.map_or_else(
+                || "error".to_string(),
+                |c| {
+                    serde_json::to_value(c)
+                        .ok()
+                        .and_then(|v| v.as_str().map(String::from))
+                        .unwrap_or_else(|| "error".to_string())
+                },
+            );
+            let reason = reason.unwrap_or(message);
             CliError::Execution(format!(
-                "cannot reach screener server at {base}: {e}{}",
-                error_chain(&e)
+                "screener server at {base} returned HTTP {status} ({code}): {reason}"
             ))
-        })?;
-    let status = resp.status();
-    let body: serde_json::Value = resp
-        .json()
-        .map_err(|e| CliError::Execution(format!("invalid screener response from {base}: {e}")))?;
-    if !status.is_success() {
-        let code = body["error"]["code"].as_str().unwrap_or("error");
-        let reason = body["error"]["context"]["reason"]
-            .as_str()
-            .or_else(|| body["error"]["message"].as_str())
-            .unwrap_or("unknown error");
-        return Err(CliError::Execution(format!(
-            "screener server at {base} returned HTTP {status} ({code}): {reason}"
-        )));
-    }
-    let rows = body["data"]["rows"]
-        .as_array()
-        .map(|r| r.len())
-        .ok_or_else(|| {
-            CliError::Execution(format!(
-                "malformed screener response from {base}: missing data.rows"
-            ))
-        })?;
+        }
+        ClientError::BadBody(m) => {
+            CliError::Execution(format!("invalid screener response from {base}: {m}"))
+        }
+        ClientError::InvalidBase(m) => {
+            CliError::Execution(format!("invalid screener server `{m}`"))
+        }
+    })?;
+    let rows = data["rows"].as_array().map(|r| r.len()).ok_or_else(|| {
+        CliError::Execution(format!(
+            "malformed screener response from {base}: missing data.rows"
+        ))
+    })?;
     Ok(rows)
 }
 
 /// Convenience wrapper over [`ScanArgs`].
 ///
-/// With `--server` the scan runs against a live `GET /screener/scan` endpoint
+/// With `--server` the scan runs against a live `GET /api/v2/screener/scans` endpoint
 /// (no silent fallback on error); without it, the offline fixture universe is
 /// used.
 pub fn run_scan_args(args: &ScanArgs) -> Result<CommandOutcome, CliError> {

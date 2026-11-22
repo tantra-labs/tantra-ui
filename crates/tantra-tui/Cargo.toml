@@ -22,6 +22,7 @@ tantra-agent-acp.workspace = true
 agent-client-protocol.workspace = true
 tantra-agent-llm.workspace = true
 tantra-agent-chat-tools.workspace = true
+tantra-runtime-client.workspace = true
 tokio = { workspace = true, features = ["full"] }
 futures.workspace = true
 serde.workspace = true

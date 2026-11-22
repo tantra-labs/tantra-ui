@@ -1122,7 +1122,7 @@ pub fn run_memory_with_home(args: &MemoryArgs, home: &Path) -> Result<CommandOut
 const BUILTIN_PLUGINS: [(&str, &str); 4] = [
     (
         "screener",
-        "canonical screener evaluator + live GET /screener/scan",
+        "canonical screener evaluator + live GET /api/v2/screener/scans",
     ),
     (
         "risk-sebi",
@@ -1762,7 +1762,7 @@ pub fn run_health_with_home(home: &Path) -> Result<CommandOutcome, CliError> {
          tui       ready (ratatui 7-tab workstation)\n\
          ask/chat  wired (OpenAI-compatible providers from tantra.jsonc)\n\
          scan      wired (canonical screener evaluator; live `tantra scan --server <url>`)\n\
-         serve     wired (tantra-runtime-api-rest, incl. GET /screener/scan)\n\
+         serve     wired (tantra-runtime-api-rest, incl. GET /api/v2/screener/scans)\n\
          jobs      wired (FileJobRegistry + journal)\n\
          memory    {memory_notes} note(s) at {home_disp}/memory\n\
          plugin    {plugin_count} disk plugin(s) at {home_disp}/plugins\n\

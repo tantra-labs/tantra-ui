@@ -1,10 +1,10 @@
 //! Daily-bar price feed for the Analysis Price card (runtime `GET /api/v2/bars/{id}`).
 
-use std::fmt;
 use std::str::FromStr;
 use std::time::Duration;
 
 use rust_decimal::Decimal;
+use tantra_runtime_client::{ClientError, RuntimeClient};
 
 use crate::agent_link::AgentConnection;
 
@@ -111,30 +111,17 @@ pub fn parse_bar_closes(body: &serde_json::Value) -> Result<Vec<Decimal>, PriceF
         .collect()
 }
 
-/// HTTP client for runtime daily bars.
-#[derive(Clone)]
+/// HTTP client for runtime daily bars (over [`RuntimeClient`]).
+#[derive(Clone, Debug)]
 pub struct PriceFeed {
-    base: String,
-    token: Option<String>,
-    http: reqwest::Client,
-}
-
-impl fmt::Debug for PriceFeed {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("PriceFeed")
-            .field("base", &self.base)
-            .field("token", &self.token.as_ref().map(|_| "[REDACTED]"))
-            .finish()
-    }
+    client: Result<RuntimeClient, ClientError>,
 }
 
 impl PriceFeed {
     pub fn new(base: String, token: Option<String>) -> Self {
-        let http = reqwest::Client::builder()
-            .timeout(Duration::from_secs(5))
-            .build()
-            .unwrap_or_default();
-        Self { base, token, http }
+        Self {
+            client: RuntimeClient::with_timeout(&base, token, Duration::from_secs(5)),
+        }
     }
 
     pub async fn daily_closes(
@@ -142,43 +129,20 @@ impl PriceFeed {
         instrument: &str,
         from: chrono::NaiveDate,
     ) -> Result<Vec<Decimal>, PriceFeedError> {
+        let client = self
+            .client
+            .as_ref()
+            .map_err(|e| PriceFeedError::Unreachable(e.to_string()))?;
         let id = bars_path_id(instrument);
-        let encoded: String = id
-            .bytes()
-            .map(|b| match b {
-                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                    (b as char).to_string()
-                }
-                _ => format!("%{b:02X}"),
-            })
-            .collect();
-        let url = format!(
-            "{}/api/v2/bars/{}?tf=1d&from={}",
-            self.base.trim_end_matches('/'),
-            encoded,
-            from.format("%Y-%m-%d")
-        );
-        let mut req = self.http.get(url);
-        if let Some(t) = &self.token {
-            req = req.bearer_auth(t);
-        }
-        let resp = req
-            .send()
-            .await
-            .map_err(|e| PriceFeedError::Unreachable(e.without_url().to_string()))?;
-        let status = resp.status();
-        if status == reqwest::StatusCode::NOT_FOUND {
+        let from = from.format("%Y-%m-%d").to_string();
+        match client.bars(&id, "1d", Some(&from), None).await {
+            Ok(body) => parse_bar_closes(&body),
             // The runtime answers 404 `not_found` when the instrument is not in its
             // instrument master / data dir: there are no bars to show.
-            return Err(PriceFeedError::NoBars);
+            Err(ClientError::Http { status: 404, .. }) => Err(PriceFeedError::NoBars),
+            Err(ClientError::Http { status, .. }) => Err(PriceFeedError::Http(status)),
+            Err(ClientError::BadBody(m)) => Err(PriceFeedError::BadBody(m)),
+            Err(e) => Err(PriceFeedError::Unreachable(e.to_string())),
         }
-        if !status.is_success() {
-            return Err(PriceFeedError::Http(status.as_u16()));
-        }
-        let body: serde_json::Value = resp
-            .json()
-            .await
-            .map_err(|e| PriceFeedError::BadBody(e.without_url().to_string()))?;
-        parse_bar_closes(&body)
     }
 }

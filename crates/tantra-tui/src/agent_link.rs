@@ -1,4 +1,4 @@
-//! Link between the TUI and the agent over ACP (embedded host or runtime `/api/v1/acp`).
+//! Link between the TUI and the agent over ACP (embedded host or runtime `/api/v2/acp`).
 
 use std::fmt;
 use std::sync::Arc;
@@ -29,7 +29,7 @@ pub enum AgentConnection {
     },
     /// Runtime ACP websocket endpoint (full runtime tool set).
     Remote {
-        /// `ws://host:port/api/v1/acp` (a bare `ws://host:port` gets that path).
+        /// `ws://host:port/api/v2/acp` (a bare `ws://host:port` gets that path).
         url: String,
         /// Bearer token (never logged).
         token: Option<String>,
@@ -134,8 +134,8 @@ pub fn map_client_event(ev: ClientEvent) -> Option<AgentStreamUpdate> {
     }
 }
 
-/// Default ACP path on the runtime (`/api/v1` router, `acp_ws_handler`).
-pub const RUNTIME_ACP_PATH: &str = "/api/v1/acp";
+/// Default ACP path on the runtime (canonical `/api/v2`, `acp_ws_handler`).
+pub const RUNTIME_ACP_PATH: &str = "/api/v2/acp";
 
 /// Complete a `--server` URL: a bare `ws://host:port` (no path) gets [`RUNTIME_ACP_PATH`].
 pub fn acp_url(url: &str) -> String {

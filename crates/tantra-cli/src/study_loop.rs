@@ -10,10 +10,8 @@
 //! `--json`, and `--export-scene <PATH>` (writing serialized 6-layer `OverlayScene` JSON).
 
 use std::fs;
-use std::time::Duration;
 
 use rust_decimal::Decimal;
-use serde::de::DeserializeOwned;
 use tantra_runtime_api::experimental_analysis::{RollBasisMode, StudyAssetClass};
 use tantra_runtime_api::strategy_loop::{
     ExpiryHedgeRequest, ExpiryHedgeResponse, HedgeLegSideDto, HedgeOptionKindDto,
@@ -22,6 +20,7 @@ use tantra_runtime_api::strategy_loop::{
     StrategyLoopRequest, StrategyLoopResponse, StrategyParameterBoundsDto, StrategySweepRequest,
     StrategySweepResponse,
 };
+use tantra_runtime_client::{BlockingRuntimeClient, ClientError};
 use tantra_ui_charts::levels::{LevelLine, LevelLineStyle};
 use tantra_ui_charts::markers::{MarkerKind, MarkerSide, SignalMarker};
 use tantra_ui_charts::scene::{
@@ -106,32 +105,9 @@ fn asset_class_str(ac: StudyAssetClass) -> &'static str {
     }
 }
 
-fn post_v2_json<Req: serde::Serialize, Resp: DeserializeOwned>(
-    client: &reqwest::blocking::Client,
-    url: &str,
-    req: &Req,
-) -> Result<Resp, CliError> {
-    let resp =
-        client.post(url).json(req).send().map_err(|e| {
-            CliError::Execution(format!("strategy-loop request `{url}` failed: {e}"))
-        })?;
-
-    let status = resp.status();
-    let body_text = resp.text().map_err(|e| {
-        CliError::Execution(format!("failed reading response body from `{url}`: {e}"))
-    })?;
-
-    if !status.is_success() {
-        return Err(CliError::Execution(format!(
-            "strategy-loop endpoint `{url}` returned HTTP {status}: {body_text}"
-        )));
-    }
-
-    let env: serde_json::Value = serde_json::from_str(&body_text)
-        .map_err(|e| CliError::Execution(format!("invalid JSON from `{url}`: {e}")))?;
-    let payload = env.get("data").cloned().unwrap_or(env);
-    serde_json::from_value(payload)
-        .map_err(|e| CliError::Execution(format!("schema decode error from `{url}`: {e}")))
+/// Map a client failure to the CLI's error type.
+fn client_err(what: &str, e: ClientError) -> CliError {
+    CliError::Execution(format!("strategy-loop {what} failed: {e}"))
 }
 
 fn dto_to_overlay_scene(dto: &OverlaySceneDto) -> OverlayScene {
@@ -486,9 +462,8 @@ fn evaluate_live_server(
     cfg: &StrategyLoopConfig,
 ) -> Result<StrategyLoopViewModel, CliError> {
     let base = server_base.trim_end_matches('/');
-    let client = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
+    // R3b adds config-sourced tokens; none is available here yet.
+    let client = BlockingRuntimeClient::new(base, None)
         .map_err(|e| CliError::Execution(format!("failed to build HTTP client: {e}")))?;
 
     let asset_class = parse_asset_class(&cfg.symbol);
@@ -534,11 +509,9 @@ fn evaluate_live_server(
         max_chart_bars: Some(120),
     };
 
-    let eval_resp: StrategyLoopResponse = post_v2_json(
-        &client,
-        &format!("{base}/api/v2/studies/strategy-loop/evaluate"),
-        &eval_req,
-    )?;
+    let eval_resp: StrategyLoopResponse = client
+        .strategy_loop_evaluate(&eval_req)
+        .map_err(|e| client_err("evaluate", e))?;
 
     let sweep_resp: Option<StrategySweepResponse> = if args.sweep {
         let sweep_req = StrategySweepRequest {
@@ -550,11 +523,11 @@ fn evaluate_live_server(
                 max_candidates: Some(12),
             },
         };
-        Some(post_v2_json(
-            &client,
-            &format!("{base}/api/v2/studies/strategy-loop/sweep"),
-            &sweep_req,
-        )?)
+        Some(
+            client
+                .strategy_loop_sweep(&sweep_req)
+                .map_err(|e| client_err("sweep", e))?,
+        )
     } else {
         None
     };
@@ -579,11 +552,11 @@ fn evaluate_live_server(
             include_statutory_costs: true,
             iv_gt_rv: false,
         };
-        Some(post_v2_json(
-            &client,
-            &format!("{base}/api/v2/studies/strategy-loop/recommend-hedge"),
-            &hedge_req,
-        )?)
+        Some(
+            client
+                .recommend_hedge(&hedge_req)
+                .map_err(|e| client_err("recommend-hedge", e))?,
+        )
     } else {
         None
     };

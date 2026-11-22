@@ -196,7 +196,7 @@ pub struct ScanArgs {
     /// The screener query (e.g. `"roe>15 and pe between 10 30"`).
     pub query: String,
     /// Live screener server base URL (e.g. http://127.0.0.1:8000). When set, the
-    /// scan runs against that server's `GET /screener/scan`; when unset, the
+    /// scan runs against that server's `GET /api/v2/screener/scans`; when unset, the
     /// offline fixture universe is used.
     #[arg(long)]
     pub server: Option<String>,
@@ -636,7 +636,7 @@ pub struct Cli {
     #[arg(short = 'r', long = "resume", global = true)]
     pub resume: Option<String>,
 
-    /// Connect the TUI to a runtime ACP endpoint, e.g. ws://127.0.0.1:8000/api/v1/acp (or just ws://127.0.0.1:8000), instead of the embedded agent.
+    /// Connect the TUI to a runtime ACP endpoint, e.g. ws://127.0.0.1:8000/api/v2/acp (or just ws://127.0.0.1:8000), instead of the embedded agent.
     #[arg(long = "server", value_name = "WS_URL")]
     pub server: Option<String>,
 
