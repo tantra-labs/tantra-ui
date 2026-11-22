@@ -18,7 +18,7 @@ use tokio::sync::mpsc;
 use crate::agent_chat::{AgentMessage, AgentRole, AgentStreamUpdate};
 use crate::agent_link::{AgentConnection, connect, map_client_event};
 use crate::app::TuiApp;
-use crate::market_feed::{PriceFeed, PriceFeedError, PriceStatus, runtime_base};
+use crate::market_feed::{PriceFeed, PriceFeedError, PriceStatus, resolve_runtime_target};
 use crate::ui;
 use rust_decimal::Decimal;
 
@@ -28,7 +28,14 @@ use rust_decimal::Decimal;
 /// then streams turn events into the AgentChat tab.
 pub async fn run_terminal(mut app: TuiApp, conn: AgentConnection) -> Result<(), io::Error> {
     let approve = Arc::new(AtomicBool::new(app.auto_approve));
-    app.runtime_base = runtime_base(&conn);
+    let cfg_runtime = config_runtime();
+    let (base, runtime_token) = resolve_runtime_target(
+        &conn,
+        cfg_runtime
+            .as_ref()
+            .map(|e| (e.url.as_str(), e.token.as_deref())),
+    );
+    app.runtime_base = base;
     let (client, ev_rx) = tokio::time::timeout(
         Duration::from_secs(15),
         connect(&conn, Arc::clone(&approve)),
@@ -52,7 +59,16 @@ pub async fn run_terminal(mut app: TuiApp, conn: AgentConnection) -> Result<(), 
         }
     };
 
-    let res = run_loop(&mut terminal, &mut app, conn, approve, client, ev_rx).await;
+    let res = run_loop(
+        &mut terminal,
+        &mut app,
+        conn,
+        approve,
+        client,
+        ev_rx,
+        runtime_token,
+    )
+    .await;
 
     // Clean teardown
     disable_raw_mode()?;
@@ -60,6 +76,26 @@ pub async fn run_terminal(mut app: TuiApp, conn: AgentConnection) -> Result<(), 
     terminal.show_cursor()?;
 
     res
+}
+
+/// `runtime` block of `tantra.jsonc` (discovered from cwd/user dir). A load or resolve failure
+/// is non-fatal: warn and fall back to defaults.
+fn config_runtime() -> Option<tantra_agent_llm::RuntimeEndpoint> {
+    let loaded = match tantra_agent_llm::load_config(None) {
+        Ok(l) => l,
+        Err(tantra_agent_llm::ConfigError::NotFound { .. }) => return None,
+        Err(e) => {
+            eprintln!("warning: tantra.jsonc unreadable ({e}); using default runtime endpoint");
+            return None;
+        }
+    };
+    match tantra_agent_llm::resolve_runtime(&loaded, &|k| std::env::var(k).ok()) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("warning: tantra.jsonc runtime block unusable ({e}); using defaults");
+            None
+        }
+    }
 }
 
 fn sync_models(app: &mut TuiApp, client: &AcpClient) {
@@ -83,17 +119,14 @@ async fn run_loop(
     approve: Arc<AtomicBool>,
     client: AcpClient,
     ev_rx: mpsc::Receiver<ClientEvent>,
+    runtime_token: Option<String>,
 ) -> Result<(), io::Error> {
     let mut client = client;
     let mut ev_rx = ev_rx;
     let mut events_open = true;
     sync_models(app, &client);
 
-    let token = match &conn {
-        AgentConnection::Remote { token, .. } => token.clone(),
-        _ => None,
-    };
-    let feed = PriceFeed::new(app.runtime_base.clone(), token);
+    let feed = PriceFeed::new(app.runtime_base.clone(), runtime_token);
     let (px_tx, mut px_rx) = mpsc::channel::<(String, Result<Vec<Decimal>, PriceFeedError>)>(8);
     let mut last_req: Option<(String, std::time::Instant)> = None;
 

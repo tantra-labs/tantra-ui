@@ -197,6 +197,44 @@ pub fn resolve_catalog(
     Ok(Some(Arc::new(catalog.with_default(id))))
 }
 
+/// `runtime` block of `tantra.jsonc` (cwd/user discovery). Failures are non-fatal: warn on
+/// stderr and return `None` so callers fall back to flag/default behaviour.
+pub fn config_runtime() -> Option<tantra_agent_llm::RuntimeEndpoint> {
+    let loaded = match load_config(None) {
+        Ok(l) => l,
+        Err(ConfigError::NotFound { .. }) => return None,
+        Err(e) => {
+            eprintln!("warning: tantra.jsonc unreadable ({e}); ignoring runtime block");
+            return None;
+        }
+    };
+    match tantra_agent_llm::resolve_runtime(&loaded, &|k| std::env::var(k).ok()) {
+        Ok(e) => e,
+        Err(e) => {
+            eprintln!("warning: tantra.jsonc runtime block unusable ({e}); ignoring it");
+            None
+        }
+    }
+}
+
+/// Resolve the `(base, token)` for a CLI REST client. `server` is the explicit `--server` flag
+/// (wins); otherwise the config `runtime` block. A config token is only sent to the config's
+/// own host. `None` when neither source names a server.
+pub fn resolve_cli_runtime(server: Option<&str>) -> Option<(String, Option<String>)> {
+    let cfg = config_runtime();
+    match server {
+        Some(s) => {
+            let token = cfg.and_then(|c| {
+                (tantra_tui::market_feed::base_of(&c.url) == tantra_tui::market_feed::base_of(s))
+                    .then_some(c.token)
+                    .flatten()
+            });
+            Some((s.to_string(), token))
+        }
+        None => cfg.map(|c| (c.url, c.token)),
+    }
+}
+
 /// Dispatch a parsed command using default provider resolution.
 pub fn run(cli: &CliArgs) -> Result<CommandOutcome, CliError> {
     let resolved = resolve_provider(cli.config.as_deref(), cli.model.as_deref())?;

@@ -234,7 +234,8 @@ pub fn live_scan(
         as_of: as_of.map(String::from),
     };
     let base = server.trim_end_matches('/');
-    let client = BlockingRuntimeClient::new(base, None)
+    let token = crate::runner::resolve_cli_runtime(Some(base)).and_then(|(_, t)| t);
+    let client = BlockingRuntimeClient::new(base, token)
         .map_err(|e| CliError::Execution(format!("invalid screener server `{base}`: {e}")))?;
     let data = client.screener_scans(&query).map_err(|e| match e {
         ClientError::Unreachable(m) => {

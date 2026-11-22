@@ -62,25 +62,52 @@ pub fn bars_path_id(instrument: &str) -> String {
     format!("{symbol}.{exchange}")
 }
 
+/// Normalise any `ws(s)://` / `http(s)://` / bare URL to `scheme://host[:port]`.
+pub fn base_of(url: &str) -> String {
+    let (scheme, rest) = if let Some(r) = url.strip_prefix("ws://") {
+        ("http", r)
+    } else if let Some(r) = url.strip_prefix("wss://") {
+        ("https", r)
+    } else if let Some(r) = url.strip_prefix("https://") {
+        ("https", r)
+    } else if let Some(r) = url.strip_prefix("http://") {
+        ("http", r)
+    } else {
+        ("http", url)
+    };
+    let host = rest.split(['/', '?', '#']).next().unwrap_or(rest);
+    format!("{scheme}://{host}")
+}
+
 /// REST base (`scheme://host[:port]`) for the connection.
 pub fn runtime_base(conn: &AgentConnection) -> String {
     match conn {
-        AgentConnection::Remote { url, .. } => {
-            let (scheme, rest) = if let Some(r) = url.strip_prefix("ws://") {
-                ("http", r)
-            } else if let Some(r) = url.strip_prefix("wss://") {
-                ("https", r)
-            } else if let Some(r) = url.strip_prefix("https://") {
-                ("https", r)
-            } else if let Some(r) = url.strip_prefix("http://") {
-                ("http", r)
-            } else {
-                ("http", url.as_str())
-            };
-            let host = rest.split(['/', '?', '#']).next().unwrap_or(rest);
-            format!("{scheme}://{host}")
-        }
+        AgentConnection::Remote { url, .. } => base_of(url),
         _ => DEFAULT_RUNTIME_BASE.to_string(),
+    }
+}
+
+/// Resolve the REST base and bearer token. Precedence: explicit flags (`--server`,
+/// `--token-file`, carried by a `Remote` connection), then the `tantra.jsonc` `runtime`
+/// block `(url, token)`, then the default base with no token. A config token is only sent to
+/// the config's own host, never to a different `--server`.
+pub fn resolve_runtime_target(
+    conn: &AgentConnection,
+    cfg: Option<(&str, Option<&str>)>,
+) -> (String, Option<String>) {
+    match conn {
+        AgentConnection::Remote { url, token } => {
+            let base = base_of(url);
+            let token = token.clone().or_else(|| {
+                cfg.and_then(|(cu, ct)| if base_of(cu) == base { ct } else { None })
+                    .map(str::to_string)
+            });
+            (base, token)
+        }
+        _ => match cfg {
+            Some((url, token)) => (base_of(url), token.map(str::to_string)),
+            None => (DEFAULT_RUNTIME_BASE.to_string(), None),
+        },
     }
 }
 

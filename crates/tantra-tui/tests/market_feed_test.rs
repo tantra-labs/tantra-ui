@@ -10,7 +10,8 @@ use tantra_agent_llm::StaticCatalog;
 use tantra_tui::agent_link::AgentConnection;
 use tantra_tui::live_data::LiveData;
 use tantra_tui::market_feed::{
-    PriceFeed, PriceFeedError, PriceStatus, bars_path_id, parse_bar_closes, runtime_base,
+    PriceFeed, PriceFeedError, PriceStatus, bars_path_id, parse_bar_closes, resolve_runtime_target,
+    runtime_base,
 };
 use tantra_tui::{TuiApp, draw};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -135,4 +136,51 @@ async fn closed_port_is_unreachable() {
     let from = chrono::NaiveDate::from_ymd_opt(2026, 7, 1).unwrap();
     let err = feed.daily_closes("TCS", from).await.unwrap_err();
     assert!(matches!(err, PriceFeedError::Unreachable(_)), "{err:?}");
+}
+
+#[test]
+fn runtime_target_precedence() {
+    let embedded = AgentConnection::Embedded {
+        catalog: Arc::new(StaticCatalog::new()),
+        model: None,
+    };
+    let cfg = Some(("http://cfg.example:9000/x", Some("cfgtok")));
+    // Embedded, no flags: config url and token.
+    assert_eq!(
+        resolve_runtime_target(&embedded, cfg),
+        (
+            "http://cfg.example:9000".to_string(),
+            Some("cfgtok".to_string())
+        )
+    );
+    // Embedded, no config: default base, no token.
+    assert_eq!(
+        resolve_runtime_target(&embedded, None),
+        ("http://127.0.0.1:8000".to_string(), None)
+    );
+    // Remote: --server wins; --token-file wins over config.
+    let remote = |t: Option<&str>| AgentConnection::Remote {
+        url: "ws://cfg.example:9000/api/v1/acp".into(),
+        token: t.map(String::from),
+    };
+    assert_eq!(
+        resolve_runtime_target(&remote(Some("flag")), cfg)
+            .1
+            .as_deref(),
+        Some("flag")
+    );
+    // Remote without token file: config token for the same host.
+    assert_eq!(
+        resolve_runtime_target(&remote(None), cfg).1.as_deref(),
+        Some("cfgtok")
+    );
+    // Remote to a different host never receives the config token.
+    let other = AgentConnection::Remote {
+        url: "ws://other:1/acp".into(),
+        token: None,
+    };
+    assert_eq!(
+        resolve_runtime_target(&other, cfg),
+        ("http://other:1".to_string(), None)
+    );
 }

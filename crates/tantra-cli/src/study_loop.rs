@@ -462,8 +462,8 @@ fn evaluate_live_server(
     cfg: &StrategyLoopConfig,
 ) -> Result<StrategyLoopViewModel, CliError> {
     let base = server_base.trim_end_matches('/');
-    // R3b adds config-sourced tokens; none is available here yet.
-    let client = BlockingRuntimeClient::new(base, None)
+    let token = crate::runner::resolve_cli_runtime(Some(base)).and_then(|(_, t)| t);
+    let client = BlockingRuntimeClient::new(base, token)
         .map_err(|e| CliError::Execution(format!("failed to build HTTP client: {e}")))?;
 
     let asset_class = parse_asset_class(&cfg.symbol);
@@ -612,10 +612,10 @@ pub fn config_from_args(args: &StudyLoopArgs) -> StrategyLoopConfig {
 /// Execute `tantra study-loop` (or flagged `tantra elephant`).
 pub fn run_study_loop(args: &StudyLoopArgs) -> Result<CommandOutcome, CliError> {
     let cfg = config_from_args(args);
-    let vm = if let Some(ref server) = args.server {
-        evaluate_live_server(server, args, &cfg)?
-    } else {
-        evaluate_offline_strategy_loop(&cfg, None)
+    // Precedence: `--server`, then the `tantra.jsonc` `runtime` block, then offline.
+    let vm = match crate::runner::resolve_cli_runtime(args.server.as_deref()) {
+        Some((server, _)) => evaluate_live_server(&server, args, &cfg)?,
+        None => evaluate_offline_strategy_loop(&cfg, None),
     };
 
     if let Some(ref path) = args.export_scene {
