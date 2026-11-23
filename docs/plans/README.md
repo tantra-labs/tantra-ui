@@ -12,6 +12,7 @@ Per workspace rule `.agents/rules/gap-tracking.md`:
 | [0002](0002-quantcept-web-ux-reference.md) | UX reference for the `AgentChat` tab, captured from a live product session | `tantra-ui` | Live product UX reference |
 | [0006](0006-elephant-edge-strategy-studio.md) | Elephant Edge (EE+) Strategy Studio — level map, signals + SL/TSL lines, positioning table (web/TUI/CLI) | `tantra-ui-app`, `tantra-tui`, `tantra-cli`, `tantra-ui-charts` | Proposed — **chart primitives shipped 2026-11-17 (gap 0007 closed, T12.9)**: `LevelLine`/`ZoneBand`/`SignalMarker`/`StopLine` in `tantra-ui-charts`; the Studio view layer remains; master plan root `docs/plans/0005` |
 | [0007](0007-agent-desk-ui-wiring-and-winning-trade-flow.md) | Agent Desk UI Wiring & Winning-Trade Flow — 14-persona roster + lenses across CLI/TUI/web, and the risk-gated screen → desk → trade-plan → place → monitor → journal journey | `tantra-cli`, `tantra-tui`, `tantra-ui-app` | Proposed — docs/design/plan only; depends on `tantra-agent` plan 0012 (persona roster) and plan 0003 (result blocks) |
+| [0011](0011-design-review-2026-11.md) | tantra-ui design review (2026-11): honest data, thin-client CLI, robust TUI & distribution (gaps 0008-0011, R1-R9) | `tantra-ui` | Proposed (2026-11-23) |
 
 ## Implemented Plans
 

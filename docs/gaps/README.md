@@ -7,7 +7,10 @@ Every gap filed in this repo, newest last. See
 
 | # | Title | Area |
 | :--- | :--- | :--- |
-| _(none)_ | — | — |
+| [0008](0008-synthetic-bars-in-run-tune-suggest.md) | Synthetic sine-wave bars drive strategy run/tune/suggest (high) | `tantra-ui-core` strategy |
+| [0009](0009-tui-panic-guard-and-async-loop.md) | TUI never restores terminal on panic; blocking network awaits (medium) | `tantra-tui` |
+| [0010](0010-state-dir-and-boot-recover.md) | Serve state CWD-relative; boot recovery on every command (medium) | `tantra-cli` |
+| [0011](0011-ui-core-purity.md) | `tantra-ui-core` not pure: fs, clock, floats (medium) | `tantra-ui-core` |
 
 ## Closed
 
