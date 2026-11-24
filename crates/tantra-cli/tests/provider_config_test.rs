@@ -71,12 +71,12 @@ fn server_and_token_file_flags_parse_into_cli_args() {
     let args: CliArgs = Cli::try_parse_from([
         "tantra",
         "--server",
-        "ws://h/api/v1/acp",
+        "ws://h/api/v2/acp",
         "--token-file",
         "/tmp/t",
     ])
     .expect("parse cli")
     .into();
-    assert_eq!(args.server.as_deref(), Some("ws://h/api/v1/acp"));
+    assert_eq!(args.server.as_deref(), Some("ws://h/api/v2/acp"));
     assert_eq!(args.token_file, Some(PathBuf::from("/tmp/t")));
 }

@@ -37,11 +37,11 @@ fn bases() {
         token: None,
     };
     assert_eq!(
-        runtime_base(&r("ws://127.0.0.1:8000/api/v1/acp")),
+        runtime_base(&r("ws://127.0.0.1:8000/api/v2/acp")),
         "http://127.0.0.1:8000"
     );
     assert_eq!(
-        runtime_base(&r("wss://h.example/api/v1/acp")),
+        runtime_base(&r("wss://h.example/api/v2/acp")),
         "https://h.example"
     );
     let conn = AgentConnection::Embedded {
@@ -160,7 +160,7 @@ fn runtime_target_precedence() {
     );
     // Remote: --server wins; --token-file wins over config.
     let remote = |t: Option<&str>| AgentConnection::Remote {
-        url: "ws://cfg.example:9000/api/v1/acp".into(),
+        url: "ws://cfg.example:9000/api/v2/acp".into(),
         token: t.map(String::from),
     };
     assert_eq!(
