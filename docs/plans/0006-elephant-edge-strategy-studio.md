@@ -1,6 +1,6 @@
 # 0006 — Elephant Edge (EE+) Strategy Studio
 
-**Status**: Phases 2–4 Implemented (2026-11-17, T12.9 remainder); Phase 1 (gap 0007)
+**Status**: Implemented (2026-11-17) — Phase 1 (`f597915`, gap 0007 closed); Phases 2–4 (T12.9 remainder)
 **Target Scope**: `tantra-ui-app` (Leptos 0.8 WASM), `tantra-tui`, `tantra-cli`,
 `tantra-ui-charts`
 **Depends on**: `tantra-ui` gap 0004 (ui-app has no view layer), gap 0007

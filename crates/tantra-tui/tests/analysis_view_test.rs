@@ -120,6 +120,7 @@ fn tool_cards_and_rows() {
                 title: "Equity".into(),
                 chart_type: "line".into(),
                 series_ref: "s1".into(),
+                series: Vec::new(),
             },
         ],
     });
@@ -178,4 +179,46 @@ fn tool_card_has_a_single_border_with_the_card_title() {
         "exactly one card corner on the title row"
     );
     assert!(card_x > 0);
+}
+
+#[test]
+fn chart_tool_cards_plot_resolved_series_in_tui() {
+    let mut app = asked();
+    app.apply_stream_update(AgentStreamUpdate::ToolFinished {
+        call_id: "c_chart".into(),
+        name: "plot_equity".into(),
+        ok: true,
+        elapsed_ms: 15,
+        blocks: vec![
+            DisplayBlock::Chart {
+                title: "Equity".into(),
+                chart_type: "line".into(),
+                series_ref: "$tantra/ref/eq".into(),
+                series: vec![
+                    (1_700_000_000, "100.00".into()),
+                    (1_700_003_600, "112.50".into()),
+                    (1_700_007_200, "125.00".into()),
+                ],
+            },
+            DisplayBlock::Chart {
+                title: "Drawdown".into(),
+                chart_type: "sparkline".into(),
+                series_ref: "$tantra/ref/dd".into(),
+                series: vec![
+                    (1_700_000_000, "0.00".into()),
+                    (1_700_003_600, "2.50".into()),
+                    (1_700_007_200, "1.00".into()),
+                ],
+            },
+        ],
+    });
+    let t = text(&app, 140, 40);
+    assert!(!t.contains("series not available"), "{t}");
+    assert!(t.contains("100.00"), "missing y min label:\n{t}");
+    assert!(t.contains("125.00"), "missing y max label:\n{t}");
+    assert!(t.contains("3 pts"), "missing sparkline summary:\n{t}");
+    assert!(
+        t.chars().any(|c| ('\u{2800}'..='\u{28FF}').contains(&c)),
+        "expected braille line plot:\n{t}"
+    );
 }

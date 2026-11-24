@@ -28,6 +28,7 @@ fn render_blocks_renders_table_metric_chart_alert() {
             title: "Equity Curve".into(),
             chart_type: "line".into(),
             series_ref: "$tantra/ref/equity-001".into(),
+            series: Vec::new(),
         },
         DisplayBlock::Alert {
             level: "INFO".into(),
@@ -150,5 +151,26 @@ fn render_blocks_summarises_overlay_scene() {
     assert!(
         out.contains("signals=1") && out.contains("stops=2"),
         "{out}"
+    );
+}
+
+#[test]
+fn render_blocks_renders_inline_chart_sparkline_when_series_present() {
+    let blocks = vec![DisplayBlock::Chart {
+        title: "Equity Curve".into(),
+        chart_type: "line".into(),
+        series_ref: "$tantra/ref/equity-001".into(),
+        series: vec![
+            (1_700_000_000, "100.00".into()),
+            (1_700_003_600, "110.00".into()),
+            (1_700_007_200, "120.00".into()),
+        ],
+    }];
+    let out = render_blocks(&blocks);
+    assert!(out.contains("Equity Curve"), "{out}");
+    assert!(out.contains("3 pts"), "{out}");
+    assert!(
+        out.chars().any(|ch| "▁▂▃▄▅▆▇█".contains(ch)),
+        "expected unicode sparkline in CLI output:\n{out}"
     );
 }

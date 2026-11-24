@@ -1,6 +1,6 @@
 # 0003 — MCP Gateway UI/CLI Integration, Result Block Rendering, and Client Configs
 
-> **Status**: Ready for implementation.
+> **Status**: Implemented (`d60d840`, 2026-11-15; `DisplayBlock::Chart.series` plotting landed 2026-11-24 with `tantra-agent` gap 0009) — reference for plan 0007.
 > **Target Crates**: `tantra-cli`, `tantra-tui`, `tantra-highlight`.
 > **Depends on reading**:
 > - `tantra-ui/docs/plans/0001-agent-chat-terminal-from-artha.md`

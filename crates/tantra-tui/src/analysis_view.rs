@@ -7,6 +7,8 @@ use ratatui::style::Style;
 use ratatui::symbols::Marker;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Axis, Chart, Dataset, GraphType, Paragraph, Sparkline, Wrap};
+use std::str::FromStr;
+
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 use tantra_agent_core::DisplayBlock;
@@ -367,7 +369,17 @@ pub(crate) fn tool_height(block: &DisplayBlock) -> u16 {
         DisplayBlock::MetricGrid { items } => items.len().min(8) + 2,
         DisplayBlock::Alert { .. } => 3,
         DisplayBlock::OverlayScene { .. } => 4,
-        DisplayBlock::Chart { .. } => 4,
+        DisplayBlock::Chart {
+            chart_type, series, ..
+        } => {
+            if series.is_empty() {
+                4
+            } else if chart_type == "sparkline" {
+                5
+            } else {
+                8
+            }
+        }
         DisplayBlock::View { summary, .. } => summary.lines().count().min(8) + 3,
         DisplayBlock::CodeDiff { code, hunks, .. } => {
             let lines = if hunks.is_empty() {
@@ -401,21 +413,15 @@ pub(crate) fn draw_tool_card(frame: &mut Frame, area: Rect, tool: &str, block: &
     let title = format!("{} · {}", tool.replace('_', " "), block_label(block));
     let frame_block = card_block(&title);
     let inner = frame_block.inner(area);
-    // stand-in for tantra-agent/docs/gaps/0009-chart-series-ref-not-delivered-to-chat-clients.md
     if let DisplayBlock::Chart {
         chart_type,
         series_ref,
+        series,
         ..
     } = block
     {
-        let lines = vec![
-            muted(format!(
-                "{chart_type} chart · series not available in the TUI yet"
-            )),
-            muted(format!("ref {series_ref}")),
-        ];
         frame.render_widget(frame_block, area);
-        frame.render_widget(Paragraph::new(lines), inner);
+        draw_chart_card_inner(frame, inner, chart_type, series_ref, series);
     } else {
         // The widget draws its own rounded frame on `area`; the card frame is then drawn
         // over it (a Block only paints border cells), so the card title wins and there is
@@ -423,4 +429,95 @@ pub(crate) fn draw_tool_card(frame: &mut Frame, area: Rect, tool: &str, block: &
         frame.render_widget(ResultBlockWidget { block }, area);
         frame.render_widget(frame_block, area);
     }
+}
+
+fn draw_chart_card_inner(
+    frame: &mut Frame,
+    inner: Rect,
+    chart_type: &str,
+    series_ref: &str,
+    series: &[(i64, String)],
+) {
+    let values: Vec<Decimal> = series
+        .iter()
+        .filter_map(|(_, raw)| Decimal::from_str(raw.trim()).ok())
+        .collect();
+    if values.is_empty() {
+        let lines = vec![
+            muted(format!(
+                "{chart_type} chart · series not available in the TUI yet"
+            )),
+            muted(format!("ref {series_ref}")),
+        ];
+        frame.render_widget(Paragraph::new(lines), inner);
+        return;
+    }
+
+    let lo = values.iter().copied().min().unwrap_or(Decimal::ZERO);
+    let hi = values.iter().copied().max().unwrap_or(Decimal::ZERO);
+    let span = hi - lo;
+
+    if chart_type == "sparkline" || values.len() < 2 {
+        let header = muted(format!("{} pts · min {lo:.2} · max {hi:.2}", values.len()));
+        if inner.height < 2 {
+            frame.render_widget(Paragraph::new(header), inner);
+            return;
+        }
+        let parts = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(1)])
+            .split(inner);
+        frame.render_widget(Paragraph::new(header), parts[0]);
+        let scaled: Vec<u64> = values
+            .iter()
+            .map(|v| {
+                if span.is_zero() {
+                    50
+                } else {
+                    ((*v - lo) / span * Decimal::from(100))
+                        .round()
+                        .to_u64()
+                        .unwrap_or(0)
+                }
+            })
+            .collect();
+        frame.render_widget(
+            Sparkline::default()
+                .data(&scaled)
+                .style(Style::default().fg(theme::PRIMARY)),
+            parts[1],
+        );
+        return;
+    }
+
+    let mut pad = span / Decimal::from(100);
+    if pad.is_zero() {
+        pad = if hi.is_zero() {
+            Decimal::ONE
+        } else {
+            hi.abs() / Decimal::from(100)
+        };
+    }
+    let data: Vec<(f64, f64)> = values
+        .iter()
+        .enumerate()
+        .map(|(i, p)| (i as f64, coord_f64(*p)))
+        .collect();
+    let ds = Dataset::default()
+        .marker(Marker::Braille)
+        .graph_type(GraphType::Line)
+        .style(theme::fg(theme::PRIMARY))
+        .data(&data);
+    let label_style = theme::fg(theme::TEXT_MUTED);
+    let chart = Chart::new(vec![ds])
+        .x_axis(Axis::default().bounds([0.0, (values.len() - 1) as f64]))
+        .y_axis(
+            Axis::default()
+                .bounds([coord_f64(lo - pad), coord_f64(hi + pad)])
+                .labels(vec![
+                    Span::styled(format!("{lo:.2}"), label_style),
+                    Span::styled(format!("{hi:.2}"), label_style),
+                ]),
+        );
+    frame.render_widget(chart, inner);
 }

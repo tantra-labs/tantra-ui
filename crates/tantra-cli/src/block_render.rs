@@ -10,6 +10,7 @@
 use std::str::FromStr;
 
 use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use serde_json::Value;
 use tantra_agent_core::result::{CodeDiffHunk, DisplayBlock, MetricItem};
 
@@ -41,7 +42,8 @@ pub fn render_blocks(blocks: &[DisplayBlock]) -> String {
                 title,
                 chart_type,
                 series_ref,
-            } => out.push_str(&render_chart(title, chart_type, series_ref)),
+                series,
+            } => out.push_str(&render_chart(title, chart_type, series_ref, series)),
             DisplayBlock::Alert { level, message } => out.push_str(&render_alert(level, message)),
             DisplayBlock::OverlayScene {
                 title,
@@ -164,11 +166,46 @@ fn render_metric_grid(items: &[MetricItem]) -> String {
     out
 }
 
-fn render_chart(title: &str, chart_type: &str, series_ref: &str) -> String {
-    // series refs are gateway-side data-store URIs (tantra-agent-mcp
-    // DataReferenceStore); CLI renders the reference honestly — plan 0003
-    // Phase 1.
-    format!("📈 {title} ({chart_type}) — series {series_ref}\n")
+fn unicode_sparkline(series: &[(i64, String)]) -> String {
+    const BARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    let vals: Vec<Decimal> = series
+        .iter()
+        .filter_map(|(_, raw)| Decimal::from_str(raw.trim()).ok())
+        .collect();
+    if vals.is_empty() {
+        return String::new();
+    }
+    let lo = vals.iter().copied().min().unwrap_or(Decimal::ZERO);
+    let hi = vals.iter().copied().max().unwrap_or(Decimal::ZERO);
+    let span = hi - lo;
+    vals.iter()
+        .map(|v| {
+            let idx = if span.is_zero() {
+                3
+            } else {
+                ((*v - lo) / span * Decimal::from(7))
+                    .round()
+                    .to_usize()
+                    .unwrap_or(0)
+                    .min(7)
+            };
+            BARS[idx]
+        })
+        .collect()
+}
+
+fn render_chart(
+    title: &str,
+    chart_type: &str,
+    series_ref: &str,
+    series: &[(i64, String)],
+) -> String {
+    if series.is_empty() {
+        format!("📈 {title} ({chart_type}) — series {series_ref}\n")
+    } else {
+        let spark = unicode_sparkline(series);
+        format!("📈 {title} ({chart_type}, {} pts) {spark}\n", series.len())
+    }
 }
 
 /// Count of one scene layer array (`signals`, `bands`, ...); 0 when absent.

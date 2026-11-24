@@ -1,11 +1,15 @@
 //! Ratatui widget for rendering MCP gateway result blocks (`DisplayBlock`)
 //! inside the terminal workstation (plan 0003).
 
+use std::str::FromStr;
+
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Paragraph, Row, Table, Widget};
+use rust_decimal::Decimal;
+use rust_decimal::prelude::ToPrimitive;
 use tantra_agent_core::result::DisplayBlock;
 
 use crate::theme;
@@ -67,11 +71,15 @@ impl<'a> Widget for ResultBlockWidget<'a> {
                 title,
                 chart_type,
                 series_ref,
+                series,
             } => {
-                // Chart data lives in the gateway-side data store; render the
-                // reference honestly (plan 0003 Phase 1).
-                let line = Line::from(format!("{title} ({chart_type}) series {series_ref}"));
-                let paragraph = Paragraph::new(line).block(theme::field_block(false));
+                let text = if series.is_empty() {
+                    format!("{title} ({chart_type}) series {series_ref}")
+                } else {
+                    let spark = unicode_sparkline(series);
+                    format!("{title} ({chart_type}, {} pts) {spark}", series.len())
+                };
+                let paragraph = Paragraph::new(Line::from(text)).block(theme::field_block(false));
                 Widget::render(paragraph, area, buf);
             }
             DisplayBlock::OverlayScene {
@@ -167,4 +175,32 @@ fn content_width(columns: &[String], rows: &[Vec<String>]) -> u16 {
         .unwrap_or(4)
         .clamp(4, 20) as u16;
     widest + 2
+}
+
+fn unicode_sparkline(series: &[(i64, String)]) -> String {
+    const BARS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+    let vals: Vec<Decimal> = series
+        .iter()
+        .filter_map(|(_, raw)| Decimal::from_str(raw.trim()).ok())
+        .collect();
+    if vals.is_empty() {
+        return String::new();
+    }
+    let lo = vals.iter().copied().min().unwrap_or(Decimal::ZERO);
+    let hi = vals.iter().copied().max().unwrap_or(Decimal::ZERO);
+    let span = hi - lo;
+    vals.iter()
+        .map(|v| {
+            let idx = if span.is_zero() {
+                3
+            } else {
+                ((*v - lo) / span * Decimal::from(7))
+                    .round()
+                    .to_usize()
+                    .unwrap_or(0)
+                    .min(7)
+            };
+            BARS[idx]
+        })
+        .collect()
 }
