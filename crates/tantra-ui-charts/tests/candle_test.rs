@@ -11,11 +11,11 @@ fn dec(s: &str) -> Decimal {
 
 fn bar(open: &str, high: &str, low: &str, close: &str) -> Bar {
     Bar {
-        instrument: InstrumentId::new(Exchange::Nse, "RELIANCE"),
-        open: Price::new(dec(open)),
-        high: Price::new(dec(high)),
-        low: Price::new(dec(low)),
-        close: Price::new(dec(close)),
+        instrument: InstrumentId::try_new(Exchange::Nse, "RELIANCE").unwrap(),
+        open: Price::try_new(dec(open)).unwrap(),
+        high: Price::try_new(dec(high)).unwrap(),
+        low: Price::try_new(dec(low)).unwrap(),
+        close: Price::try_new(dec(close)).unwrap(),
         volume: Quantity::from_u64(1000),
         timestamp: tantra_core::chrono::Utc::now(),
     }
@@ -34,20 +34,20 @@ fn candle_from_bar_maps_ohlc() {
 #[test]
 fn candle_direction_and_ranges() {
     let bull = Candle::new(
-        Price::new(dec("100")),
-        Price::new(dec("105")),
-        Price::new(dec("99")),
-        Price::new(dec("104")),
+        Price::try_new(dec("100")).unwrap(),
+        Price::try_new(dec("105")).unwrap(),
+        Price::try_new(dec("99")).unwrap(),
+        Price::try_new(dec("104")).unwrap(),
     );
     assert!(bull.is_bullish());
     assert_eq!(bull.body(), dec("4"));
     assert_eq!(bull.range(), dec("6"));
 
     let bear = Candle::new(
-        Price::new(dec("100")),
-        Price::new(dec("101")),
-        Price::new(dec("90")),
-        Price::new(dec("92")),
+        Price::try_new(dec("100")).unwrap(),
+        Price::try_new(dec("101")).unwrap(),
+        Price::try_new(dec("90")).unwrap(),
+        Price::try_new(dec("92")).unwrap(),
     );
     assert!(!bear.is_bullish());
     assert_eq!(bear.body(), dec("8"));
@@ -68,16 +68,16 @@ fn chart_from_bars_preserves_order() {
 fn price_range_covers_all_extremes() {
     let candles = vec![
         Candle::new(
-            Price::new(dec("100")),
-            Price::new(dec("110")),
-            Price::new(dec("90")),
-            Price::new(dec("105")),
+            Price::try_new(dec("100")).unwrap(),
+            Price::try_new(dec("110")).unwrap(),
+            Price::try_new(dec("90")).unwrap(),
+            Price::try_new(dec("105")).unwrap(),
         ),
         Candle::new(
-            Price::new(dec("105")),
-            Price::new(dec("120")),
-            Price::new(dec("95")),
-            Price::new(dec("115")),
+            Price::try_new(dec("105")).unwrap(),
+            Price::try_new(dec("120")).unwrap(),
+            Price::try_new(dec("95")).unwrap(),
+            Price::try_new(dec("115")).unwrap(),
         ),
     ];
     assert_eq!(CandlestickChart::price_range(&candles), dec("30"));
@@ -86,10 +86,10 @@ fn price_range_covers_all_extremes() {
 #[test]
 fn y_for_price_maps_high_to_top() {
     let candles = vec![Candle::new(
-        Price::new(dec("100")),
-        Price::new(dec("110")),
-        Price::new(dec("90")),
-        Price::new(dec("105")),
+        Price::try_new(dec("100")).unwrap(),
+        Price::try_new(dec("110")).unwrap(),
+        Price::try_new(dec("90")).unwrap(),
+        Price::try_new(dec("105")).unwrap(),
     )];
     let chart = CandlestickChart {
         candles,

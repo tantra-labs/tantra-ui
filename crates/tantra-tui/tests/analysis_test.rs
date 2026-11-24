@@ -96,16 +96,16 @@ fn page_cards_cap_newest_first_and_scroll() {
 #[test]
 fn price_history_grows_and_caps() {
     let mut live = LiveData::new();
-    let inst = InstrumentId::new(Exchange::Nse, "NIFTY50");
+    let inst = InstrumentId::try_new(Exchange::Nse, "NIFTY50").unwrap();
     for i in 0..(PRICE_HISTORY_CAP + 10) {
-        let px = Price::new(Decimal::from_str(&(100 + i).to_string()).unwrap());
+        let px = Price::try_new(Decimal::from_str(&(100 + i).to_string()).unwrap()).unwrap();
         live.apply_event(&ClientEvent::Bar(Bar {
             instrument: inst.clone(),
             open: px,
             high: px,
             low: px,
             close: px,
-            volume: Quantity::new(Decimal::from(1)),
+            volume: Quantity::try_new(Decimal::from(1)).unwrap(),
             timestamp: Utc::now(),
         }));
     }

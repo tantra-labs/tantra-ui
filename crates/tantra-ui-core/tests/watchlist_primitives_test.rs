@@ -16,14 +16,14 @@ fn inr(amount: &str) -> tantra_core::types::Money {
 }
 
 fn inst(symbol: &str) -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, symbol)
+    InstrumentId::try_new(Exchange::Nse, symbol).unwrap()
 }
 
 fn row(symbol: &str, price: &str) -> WatchlistRow {
     WatchlistRow::new(
         inst(symbol),
         symbol,
-        tantra_core::types::Price::new(dec(price)),
+        tantra_core::types::Price::try_new(dec(price)).unwrap(),
         Delta::new(dec("0"), dec("0")),
     )
 }

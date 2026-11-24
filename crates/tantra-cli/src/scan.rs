@@ -31,7 +31,8 @@ use crate::runner::{CliError, CommandOutcome};
 /// // offline fixture universe — live path is `tantra scan --server`; gap ui 0006
 pub fn scan_universe() -> Vec<tantra_core::screener::ScreenerRow> {
     let row = |symbol: &str, pe: u64, roe: u64, market_cr: u64| {
-        let instrument = InstrumentId::new(Exchange::Nse, symbol);
+        let instrument =
+            InstrumentId::try_new(Exchange::Nse, symbol).expect("valid fixture symbol");
         let mut metrics = BTreeMap::new();
         metrics.insert("pe".to_string(), Decimal::from(pe));
         metrics.insert("roe".to_string(), Decimal::from(roe));
@@ -158,7 +159,7 @@ pub fn run_scan(query: &str) -> Result<CommandOutcome, CliError> {
 pub fn default_live_universe() -> Vec<String> {
     scan_universe()
         .iter()
-        .map(|row| format!("NSE:{}", row.instrument.symbol))
+        .map(|row| format!("NSE:{}", row.instrument.symbol()))
         .collect()
 }
 

@@ -12,14 +12,14 @@ fn dec(s: &str) -> Decimal {
 }
 
 fn inst(symbol: &str) -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, symbol)
+    InstrumentId::try_new(Exchange::Nse, symbol).unwrap()
 }
 
 fn reliance_row() -> WatchlistRow {
     WatchlistRow::new(
         inst("RELIANCE"),
         "RELIANCE",
-        Price::new(dec("2400.00")),
+        Price::try_new(dec("2400.00")).unwrap(),
         Delta::new(dec("0"), dec("0")),
     )
 }
@@ -40,7 +40,7 @@ fn upsert_row_replaces_and_keeps_count() {
     let tcs = WatchlistRow::new(
         inst("TCS"),
         "TCS",
-        Price::new(dec("3400.00")),
+        Price::try_new(dec("3400.00")).unwrap(),
         Delta::new(dec("0"), dec("0")),
     );
     assert!(!f.upsert_row(tcs));
@@ -62,7 +62,7 @@ fn ingest_tick_updates_price_and_delta() {
     f.upsert_row(reliance_row());
     let tick = Tick::Ltp {
         instrument: inst("RELIANCE"),
-        price: Price::new(dec("2404.80")),
+        price: Price::try_new(dec("2404.80")).unwrap(),
         volume: Quantity::from_u64(500),
         exchange_ts: tantra_core::chrono::Utc::now(),
         receive_ts: tantra_core::chrono::Utc::now(),
@@ -81,10 +81,10 @@ fn ingest_bar_appends_spark_and_updates_price() {
     f.upsert_row(reliance_row());
     let bar = Bar {
         instrument: inst("RELIANCE"),
-        open: Price::new(dec("2400.00")),
-        high: Price::new(dec("2406.00")),
-        low: Price::new(dec("2398.00")),
-        close: Price::new(dec("2405.00")),
+        open: Price::try_new(dec("2400.00")).unwrap(),
+        high: Price::try_new(dec("2406.00")).unwrap(),
+        low: Price::try_new(dec("2398.00")).unwrap(),
+        close: Price::try_new(dec("2405.00")).unwrap(),
         volume: Quantity::from_u64(1000),
         timestamp: tantra_core::chrono::Utc::now(),
     };
@@ -100,7 +100,7 @@ fn tick_for_unsubscribed_instrument_is_ignored() {
     f.upsert_row(reliance_row());
     let tick = Tick::Ltp {
         instrument: inst("TCS"),
-        price: Price::new(dec("3400.25")),
+        price: Price::try_new(dec("3400.25")).unwrap(),
         volume: Quantity::from_u64(100),
         exchange_ts: tantra_core::chrono::Utc::now(),
         receive_ts: tantra_core::chrono::Utc::now(),

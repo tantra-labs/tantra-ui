@@ -217,7 +217,7 @@ pub fn studio_ee_positions(intents: &[PositionIntent]) -> Vec<(String, String, S
         .map(|p| {
             (
                 p.instrument.to_string(),
-                format!("{} {}", side_label(p.side), p.quantity.0),
+                format!("{} {}", side_label(p.side), p.quantity.value()),
                 format!("₹{}", p.risk_cap.amount),
             )
         })
@@ -363,7 +363,8 @@ pub fn ee_seed_level_map() -> LevelMap {
 /// The seeded signals: a `BUY RETEST` anchored to S1 (entry 23950) and a
 /// `SELL BREAKOUT` anchored to R1 (entry 24150).
 pub fn ee_seed_signals() -> Vec<StrategySignal> {
-    let instrument = InstrumentId::new(Exchange::Nse, "NIFTY50");
+    let instrument =
+        InstrumentId::try_new(Exchange::Nse, "NIFTY50").expect("valid seed instrument");
     let ts = chrono::DateTime::from_timestamp(1_700_000_000, 0).expect("valid seed timestamp");
     vec![
         StrategySignal::new(
@@ -392,7 +393,7 @@ pub fn ee_seed_signals() -> Vec<StrategySignal> {
 pub fn ee_seed_positions() -> Vec<PositionIntent> {
     vec![
         PositionIntent::new(
-            InstrumentId::new(Exchange::Nse, "NIFTY50"),
+            InstrumentId::try_new(Exchange::Nse, "NIFTY50").expect("valid seed instrument"),
             OrderSide::Buy,
             Quantity::from_u64(25),
             Money::inr(Decimal::from(5_000)),
@@ -400,7 +401,7 @@ pub fn ee_seed_positions() -> Vec<PositionIntent> {
         )
         .expect("valid seed position"),
         PositionIntent::new(
-            InstrumentId::new(Exchange::Nse, "RELIANCE"),
+            InstrumentId::try_new(Exchange::Nse, "RELIANCE").expect("valid seed instrument"),
             OrderSide::Sell,
             Quantity::from_u64(100),
             Money::inr(Decimal::from(12_000)),

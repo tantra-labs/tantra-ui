@@ -298,7 +298,7 @@ impl LiveData {
                     .iter()
                     .map(|p| PaperPositionRow {
                         instrument: format!("{}", p.instrument),
-                        quantity: p.quantity.0,
+                        quantity: p.quantity.value(),
                     })
                     .collect();
                 self.paper_cash = snapshot.totals.cash.amount;
@@ -331,8 +331,8 @@ impl LiveData {
     /// Fold a paper fill into the fills feed and enrich its order row.
     fn apply_paper_fill(&mut self, fill: &FillReport) {
         let side = format!("{:?}", fill.side);
-        let quantity = fill.quantity.0;
-        let price = fill.price.0;
+        let quantity = fill.quantity.value();
+        let price = fill.price.value();
         self.paper_fills.push(PaperFillRow {
             order_id: fill.order_id.clone(),
             instrument: format!("{}", fill.instrument),
@@ -358,8 +358,8 @@ impl LiveData {
                 volume,
                 ..
             } => {
-                self.record_price(&format!("{instrument}"), price.0);
-                self.upsert_price(format!("{instrument}"), price.0, Some(volume.0));
+                self.record_price(&format!("{instrument}"), price.value());
+                self.upsert_price(format!("{instrument}"), price.value(), Some(volume.value()));
             }
             Tick::Quote {
                 instrument,
@@ -368,9 +368,13 @@ impl LiveData {
                 last_price,
                 ..
             } => {
-                let last = last_price.unwrap_or(*bid).0;
+                let last = last_price.unwrap_or(*bid).value();
                 self.upsert_price(format!("{instrument}"), last, None);
-                self.upsert_paper_depth(format!("{instrument}"), Some(bid.0), Some(ask.0));
+                self.upsert_paper_depth(
+                    format!("{instrument}"),
+                    Some(bid.value()),
+                    Some(ask.value()),
+                );
             }
             Tick::Depth {
                 instrument,
@@ -382,10 +386,10 @@ impl LiveData {
                 // Depth carries no single LTP in `last_price`; when it is
                 // absent the row is left untouched.
                 if let Some(price) = last_price {
-                    self.upsert_price(format!("{instrument}"), price.0, None);
+                    self.upsert_price(format!("{instrument}"), price.value(), None);
                 }
-                let best_bid = bids.first().map(|b| b.price.0);
-                let best_ask = asks.first().map(|a| a.price.0);
+                let best_bid = bids.first().map(|b| b.price.value());
+                let best_ask = asks.first().map(|a| a.price.value());
                 self.upsert_paper_depth(format!("{instrument}"), best_bid, best_ask);
             }
         }
@@ -393,9 +397,9 @@ impl LiveData {
 
     fn apply_bar(&mut self, bar: &Bar) {
         let symbol = format!("{}", bar.instrument);
-        let close = bar.close.0;
+        let close = bar.close.value();
         self.record_price(&symbol, close);
-        let volume = bar.volume.0;
+        let volume = bar.volume.value();
         if let Some(row) = self.watchlist.iter_mut().find(|r| r.symbol == symbol) {
             let prev_close = row.last;
             let change = close - prev_close;

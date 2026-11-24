@@ -18,7 +18,7 @@ fn inr(amount: &str) -> Money {
 }
 
 fn inst(symbol: &str) -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, symbol)
+    InstrumentId::try_new(Exchange::Nse, symbol).unwrap()
 }
 
 fn snapshot_with_positions() -> PortfolioSnapshot {
@@ -33,7 +33,7 @@ fn snapshot_with_positions() -> PortfolioSnapshot {
                 instrument: inst("RELIANCE"),
                 side: PositionSide::Long,
                 quantity: Quantity::from_u64(50),
-                avg_price: Price::new(dec("2390.00")),
+                avg_price: Price::try_new(dec("2390.00")).unwrap(),
                 unrealized_pnl: inr("587.50"),
                 realized_pnl: inr("120.00"),
             },
@@ -41,7 +41,7 @@ fn snapshot_with_positions() -> PortfolioSnapshot {
                 instrument: inst("TCS"),
                 side: PositionSide::Short,
                 quantity: Quantity::from_u64(20),
-                avg_price: Price::new(dec("3410.00")),
+                avg_price: Price::try_new(dec("3410.00")).unwrap(),
                 unrealized_pnl: inr("195.00"),
                 realized_pnl: inr("-40.00"),
             },
@@ -91,7 +91,7 @@ fn holding_row_constructor() {
     let row = PortfolioHoldingRow::new(
         inst("TCS"),
         Quantity::from_u64(10),
-        Price::new(dec("3400.00")),
+        Price::try_new(dec("3400.00")).unwrap(),
         inr("34000.00"),
     );
     assert_eq!(row.current_value.amount, dec("34000.00"));

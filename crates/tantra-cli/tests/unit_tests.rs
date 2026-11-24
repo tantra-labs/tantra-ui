@@ -378,9 +378,9 @@ fn scan_apply_matching_rows() {
     let req = parse_query("pe<25").unwrap();
     let resp = tantra_ui_api_wasm::screener::apply_scan(&scan_universe(), &req).unwrap();
     assert_eq!(resp.rows.len(), 1);
-    assert_eq!(resp.rows[0].instrument.symbol, "HDFCBANK");
+    assert_eq!(resp.rows[0].instrument.symbol(), "HDFCBANK");
     assert_eq!(
-        resp.rows[0].instrument.exchange,
+        resp.rows[0].instrument.exchange(),
         tantra_core::types::Exchange::Nse
     );
 }

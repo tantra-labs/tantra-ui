@@ -98,6 +98,9 @@ impl WatchlistFeature {
     }
 
     fn update_price(&mut self, instrument: &InstrumentId, price: Decimal) {
+        let Ok(valid_price) = Price::try_new(price) else {
+            return;
+        };
         let Some(row) = self
             .view
             .rows
@@ -112,7 +115,7 @@ impl WatchlistFeature {
             .copied()
             .unwrap_or(price);
         row.delta = delta_from(price, previous);
-        row.last_price = Price::new(price);
+        row.last_price = valid_price;
         self.previous_close.insert(instrument.clone(), price);
     }
 }

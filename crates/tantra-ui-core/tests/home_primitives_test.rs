@@ -30,11 +30,11 @@ fn market_status_closed_with_next_session() {
 
 #[test]
 fn watchlist_row_with_spark() {
-    let instrument = InstrumentId::new(Exchange::Nse, "TCS");
+    let instrument = InstrumentId::try_new(Exchange::Nse, "TCS").unwrap();
     let row = WatchlistRow::new(
         instrument.clone(),
         "TCS",
-        Price::new(dec("3400.50")),
+        Price::try_new(dec("3400.50")).unwrap(),
         Delta::new(dec("12.50"), dec("0.37")),
     )
     .with_spark(vec![dec("3380"), dec("3390"), dec("3400.50")]);

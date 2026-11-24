@@ -11,16 +11,16 @@ fn dec(s: &str) -> Decimal {
 }
 
 fn make_bars() -> Vec<Bar> {
-    let inst = InstrumentId::new(Exchange::Nse, "INFY");
+    let inst = InstrumentId::try_new(Exchange::Nse, "INFY").unwrap();
     let data = [("100", "102", "98", "101"), ("101", "105", "100", "104")];
     data.iter()
         .enumerate()
         .map(|(i, (o, h, l, c))| Bar {
             instrument: inst.clone(),
-            open: Price::new(dec(o)),
-            high: Price::new(dec(h)),
-            low: Price::new(dec(l)),
-            close: Price::new(dec(c)),
+            open: Price::try_new(dec(o)).unwrap(),
+            high: Price::try_new(dec(h)).unwrap(),
+            low: Price::try_new(dec(l)).unwrap(),
+            close: Price::try_new(dec(c)).unwrap(),
             volume: Quantity::from_u64(100 + i as u64),
             timestamp: tantra_core::chrono::Utc::now(),
         })

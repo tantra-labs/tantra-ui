@@ -11,11 +11,11 @@ fn dec(s: &str) -> Decimal {
 
 fn bar(price: &str) -> Bar {
     Bar {
-        instrument: InstrumentId::new(Exchange::Nse, "TCS"),
-        open: Price::new(dec(price)),
-        high: Price::new(dec(price)),
-        low: Price::new(dec(price)),
-        close: Price::new(dec(price)),
+        instrument: InstrumentId::try_new(Exchange::Nse, "TCS").unwrap(),
+        open: Price::try_new(dec(price)).unwrap(),
+        high: Price::try_new(dec(price)).unwrap(),
+        low: Price::try_new(dec(price)).unwrap(),
+        close: Price::try_new(dec(price)).unwrap(),
         volume: Quantity::from_u64(10),
         timestamp: tantra_core::chrono::Utc::now(),
     }

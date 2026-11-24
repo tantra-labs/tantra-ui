@@ -16,7 +16,7 @@ use uuid::Uuid;
 const TS0: i64 = 1_700_000_000;
 
 fn reliance() -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, "RELIANCE")
+    InstrumentId::try_new(Exchange::Nse, "RELIANCE").unwrap()
 }
 
 /// A fresh session has the seeded cash, empty fills/positions/events, and
@@ -71,11 +71,11 @@ fn limit_buy_fills_when_bar_crosses_limit() {
     let fills = session.fills();
     assert_eq!(fills.len(), 1);
     assert_eq!(fills[0].side, OrderSide::Buy);
-    assert_eq!(fills[0].quantity.0, dec!(100));
-    assert_eq!(fills[0].price.0, dec!(90));
+    assert_eq!(fills[0].quantity.value(), dec!(100));
+    assert_eq!(fills[0].price.value(), dec!(90));
 
     assert_eq!(session.order_state(&id), Some(OrderState::Filled));
-    assert_eq!(session.order_avg_fill_price(&id).unwrap().0, dec!(90));
+    assert_eq!(session.order_avg_fill_price(&id).unwrap().value(), dec!(90));
     // Cash = 1_000_000 − 100 × 90; position +100; equity marks it back up.
     assert_eq!(session.cash(), dec!(991_000));
     assert_eq!(session.positions().get(&inst), Some(&dec!(100)));

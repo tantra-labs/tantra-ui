@@ -19,7 +19,7 @@ use tantra_tui::live_data::{LiveData, PortfolioSummary, WatchlistRow};
 use tantra_ui_client::{ClientEvent, SystemStatus};
 
 fn sym(symbol: &str) -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, symbol)
+    InstrumentId::try_new(Exchange::Nse, symbol).unwrap()
 }
 
 fn dec(s: &str) -> Decimal {
@@ -27,11 +27,11 @@ fn dec(s: &str) -> Decimal {
 }
 
 fn price(s: &str) -> Price {
-    Price::new(dec(s))
+    Price::try_new(dec(s)).unwrap()
 }
 
 fn qty(s: &str) -> Quantity {
-    Quantity::new(dec(s))
+    Quantity::try_new(dec(s)).unwrap()
 }
 
 fn now() -> DateTime<Utc> {
@@ -122,7 +122,7 @@ fn bar_computes_change_against_previous_close() {
     assert_eq!(row.last, dec("105"));
     assert_eq!(row.change, dec("5"));
     assert_eq!(row.change_pct, dec("5"));
-    assert_eq!(row.volume, qty("100").0);
+    assert_eq!(row.volume, qty("100").value());
 }
 
 #[test]

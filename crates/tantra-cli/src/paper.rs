@@ -24,7 +24,7 @@ use uuid::Uuid;
 /// sell 50@100, buy 50@100; sell VWAP 100.6667; net position 0; cash returns
 /// to the initial balance.
 pub fn run_embedded_report(cash: Decimal, seed: Option<u64>) -> String {
-    let inst = InstrumentId::new(Exchange::Nse, "RELIANCE");
+    let inst = InstrumentId::try_new(Exchange::Nse, "RELIANCE").expect("valid RELIANCE");
     let ts0 = Utc.timestamp_opt(1_700_000_000, 0).unwrap();
 
     let mut ex = PaperExchange::new(cash).with_cost_fn(Box::new(ZeroFillCost));
@@ -74,12 +74,16 @@ pub fn run_embedded_report(cash: Decimal, seed: Option<u64>) -> String {
     for fill in ex.fills() {
         out.push_str(&format!(
             "  {} {} {:?} {} @ {}\n",
-            fill.fill_id, fill.order_id, fill.side, fill.quantity.0, fill.price.0
+            fill.fill_id,
+            fill.order_id,
+            fill.side,
+            fill.quantity.value(),
+            fill.price.value()
         ));
     }
     let sell_vwap = ex
         .order(&id_sell)
-        .map(|o| o.avg_fill_price.0)
+        .map(|o| o.avg_fill_price.value())
         .unwrap_or(Decimal::ZERO);
     let net = ex.positions().get(&inst).copied().unwrap_or(Decimal::ZERO);
     out.push_str(&format!("Sell VWAP: {sell_vwap}\n"));

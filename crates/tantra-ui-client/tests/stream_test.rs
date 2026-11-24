@@ -7,13 +7,13 @@ use tantra_ui_client::events::{ClientEvent, EventKind, SystemStatus};
 use tantra_ui_client::stream::EventStream;
 
 fn instrument() -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, "RELIANCE")
+    InstrumentId::try_new(Exchange::Nse, "RELIANCE").unwrap()
 }
 
 fn tick() -> Tick {
     Tick::Ltp {
         instrument: instrument(),
-        price: Price::new(10.into()),
+        price: Price::try_new(10.into()).unwrap(),
         volume: Quantity::from_u64(1),
         exchange_ts: tantra_core::chrono::Utc::now(),
         receive_ts: tantra_core::chrono::Utc::now(),

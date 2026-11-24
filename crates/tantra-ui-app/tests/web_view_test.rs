@@ -129,11 +129,11 @@ fn watchlist_lines_render_rows() {
     let mut feature = WatchlistFeature::new();
     assert!(watchlist_lines(&feature).is_empty());
 
-    let instrument = InstrumentId::new(Exchange::Nse, "RELIANCE");
+    let instrument = InstrumentId::try_new(Exchange::Nse, "RELIANCE").unwrap();
     let row = WatchlistRow::new(
         instrument.clone(),
         "Reliance Industries",
-        Price::new(Decimal::from(2500)),
+        Price::try_new(Decimal::from(2500)).unwrap(),
         Delta::new(Decimal::from(50), Decimal::from(2)),
     );
     feature.upsert_row(row);
@@ -228,7 +228,7 @@ fn studio_kind_labels_render() {
     let mut canvas = StudioCanvas::new();
     canvas.add_node(StudioNode::new(
         NodeId(1),
-        StudioNodeKind::Source(InstrumentId::new(Exchange::Nse, "NIFTY50")),
+        StudioNodeKind::Source(InstrumentId::try_new(Exchange::Nse, "NIFTY50").unwrap()),
         "NIFTY",
     ));
     canvas.add_node(StudioNode::new(
@@ -240,10 +240,9 @@ fn studio_kind_labels_render() {
     assert_eq!(canvas.node_count(), 2);
     assert_eq!(canvas.connection_count(), 1);
 
-    let source = studio_kind_label(&StudioNodeKind::Source(InstrumentId::new(
-        Exchange::Nse,
-        "NIFTY50",
-    )));
+    let source = studio_kind_label(&StudioNodeKind::Source(
+        InstrumentId::try_new(Exchange::Nse, "NIFTY50").unwrap(),
+    ));
     assert!(source.starts_with("source"), "label: {source}");
     assert_eq!(
         studio_kind_label(&StudioNodeKind::Indicator("sma".to_string())),

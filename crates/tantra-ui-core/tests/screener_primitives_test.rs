@@ -18,7 +18,7 @@ fn metric(name: &str) -> MetricRef {
 }
 
 fn instrument(symbol: &str) -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, symbol)
+    InstrumentId::try_new(Exchange::Nse, symbol).unwrap()
 }
 
 #[test]

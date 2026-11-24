@@ -5,7 +5,7 @@ use tantra_core::types::{Exchange, InstrumentId, Price, Quantity};
 use tantra_ui_api_wasm::replay::replay_ticks;
 
 fn inst() -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, "RELIANCE")
+    InstrumentId::try_new(Exchange::Nse, "RELIANCE").unwrap()
 }
 
 fn ts() -> tantra_core::chrono::DateTime<tantra_core::chrono::Utc> {
@@ -15,7 +15,7 @@ fn ts() -> tantra_core::chrono::DateTime<tantra_core::chrono::Utc> {
 fn ltp(price: i32, vol: u64) -> Tick {
     Tick::Ltp {
         instrument: inst(),
-        price: Price::new(price.into()),
+        price: Price::try_new(price.into()).unwrap(),
         volume: Quantity::from_u64(vol),
         exchange_ts: ts(),
         receive_ts: ts(),

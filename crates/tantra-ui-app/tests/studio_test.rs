@@ -19,7 +19,7 @@ fn add_and_connect_nodes() {
     let mut c = StudioCanvas::new();
     let source = StudioNode::new(
         NodeId(1),
-        StudioNodeKind::Source(InstrumentId::new(Exchange::Nse, "RELIANCE")),
+        StudioNodeKind::Source(InstrumentId::try_new(Exchange::Nse, "RELIANCE").unwrap()),
         "RELIANCE source",
     );
     let sma = StudioNode::new(

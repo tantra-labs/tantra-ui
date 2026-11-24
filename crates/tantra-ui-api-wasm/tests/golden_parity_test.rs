@@ -71,16 +71,16 @@ fn side(s: &str) -> OrderSide {
 
 /// Run the full golden tape through a fresh session and return it.
 fn run_tape(tape: &GoldenTape) -> PaperSession {
-    let inst = InstrumentId::new(Exchange::Nse, "RELIANCE");
+    let inst = InstrumentId::try_new(Exchange::Nse, "RELIANCE").unwrap();
     let ts0 = DateTime::parse_from_rfc3339(&tape.ts0)
         .expect("valid rfc3339 ts0 in golden tape")
         .with_timezone(&Utc);
     let mut session = PaperSession::new(decimal(&tape.initial_cash), None);
     for order in &tape.orders {
         let order_type = match order.order_type.as_str() {
-            "LIMIT" => OrderType::Limit(Price::new(decimal(
-                order.limit_price.as_ref().expect("limit price"),
-            ))),
+            "LIMIT" => OrderType::Limit(
+                Price::try_new(decimal(order.limit_price.as_ref().expect("limit price"))).unwrap(),
+            ),
             "MARKET" => OrderType::Market,
             other => panic!("unknown order type {other:?} in golden tape"),
         };
@@ -89,7 +89,7 @@ fn run_tape(tape: &GoldenTape) -> PaperSession {
             inst.clone(),
             side(&order.side),
             order_type,
-            Quantity::new(decimal(&order.quantity)),
+            Quantity::try_new(decimal(&order.quantity)).unwrap(),
             "paper_golden",
         );
         session.submit(req, ts0).unwrap();
@@ -128,9 +128,13 @@ fn golden_tape_fills_match_golden_values() {
 
     for (idx, expected) in tape.expected.fills.iter().enumerate() {
         let fill = &fills[idx];
-        assert_eq!(fill.price.0, decimal(&expected.price), "fill {idx} price");
         assert_eq!(
-            fill.quantity.0,
+            fill.price.value(),
+            decimal(&expected.price),
+            "fill {idx} price"
+        );
+        assert_eq!(
+            fill.quantity.value(),
             decimal(&expected.quantity),
             "fill {idx} quantity"
         );
@@ -156,14 +160,17 @@ fn golden_tape_fills_match_golden_values() {
         .iter()
         .filter(|f| f.client_order_id == Uuid::from_u128(sell_id))
         .collect();
-    let notional: Decimal = sell_fills.iter().map(|f| f.price.0 * f.quantity.0).sum();
-    let quantity: Decimal = sell_fills.iter().map(|f| f.quantity.0).sum();
+    let notional: Decimal = sell_fills
+        .iter()
+        .map(|f| f.price.value() * f.quantity.value())
+        .sum();
+    let quantity: Decimal = sell_fills.iter().map(|f| f.quantity.value()).sum();
     assert_eq!(
         (notional / quantity).round_dp(4),
         decimal(&tape.expected.sell_avg_fill_price)
     );
 
-    let inst = InstrumentId::new(Exchange::Nse, "RELIANCE");
+    let inst = InstrumentId::try_new(Exchange::Nse, "RELIANCE").unwrap();
     assert_eq!(session.positions().get(&inst), Some(&dec!(0)));
     assert_eq!(session.cash(), decimal(&tape.expected.net_cash));
     // Zero-fee round trip: equity returns to the initial cash.

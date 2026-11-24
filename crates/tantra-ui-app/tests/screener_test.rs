@@ -11,7 +11,7 @@ fn dec(s: &str) -> Decimal {
 }
 
 fn inst(symbol: &str) -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, symbol)
+    InstrumentId::try_new(Exchange::Nse, symbol).unwrap()
 }
 
 fn row(symbol: &str, pe: &str, roe: &str) -> ScreenerRow {

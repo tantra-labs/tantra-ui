@@ -40,5 +40,6 @@ pub fn mtm(
 
 /// Break-even price for a position including an entry cost per unit.
 pub fn break_even(entry: Price, per_unit_cost: Decimal) -> Price {
-    Price::new(entry.value() + per_unit_cost)
+    Price::try_new((entry.value() + per_unit_cost).max(Decimal::ZERO))
+        .expect("non-negative break-even price")
 }

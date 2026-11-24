@@ -127,7 +127,8 @@ fn build_synthetic_daily_slice(
     days: usize,
 ) -> tantra_runtime_api_rest::market_feed::ColumnarSlice {
     let spec = BarSpecification::new(1, BarAggregation::Day, PriceType::Last);
-    let mut builder = ColumnarSliceBuilder::new(InstrumentId::new(exchange, symbol), spec);
+    let mut builder =
+        ColumnarSliceBuilder::new(InstrumentId::try_new(exchange, symbol).unwrap(), spec);
     let mut cur = NaiveDate::from_ymd_opt(2025, 6, 16).unwrap();
     let mut count = 0usize;
     let mut price = 1400.0_f64;

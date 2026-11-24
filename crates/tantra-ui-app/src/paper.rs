@@ -176,7 +176,8 @@ impl PaperFeature {
     ///
     /// Byte-identical across runs (no latency, zero fees).
     pub fn run_embedded_demo(&mut self) {
-        let inst = InstrumentId::new(Exchange::Nse, "RELIANCE");
+        let inst =
+            InstrumentId::try_new(Exchange::Nse, "RELIANCE").expect("valid RELIANCE instrument");
         let ts0 = chrono::DateTime::from_timestamp(1_700_000_000, 0).expect("valid demo ts");
         let mut session = PaperSession::new(self.cash, None);
 
@@ -239,15 +240,15 @@ impl PaperFeature {
                     OrderSide::Buy => PaperSide::Buy,
                     OrderSide::Sell => PaperSide::Sell,
                 },
-                quantity: f.quantity.0,
-                price: f.price.0,
+                quantity: f.quantity.value(),
+                price: f.price.value(),
             })
             .collect();
         self.depth = match session.depth(&inst) {
             Some((bid, ask)) => vec![PaperDepthRow {
                 instrument: inst.to_string(),
-                bid: bid.map(|p| p.0),
-                ask: ask.map(|p| p.0),
+                bid: bid.map(|p| p.value()),
+                ask: ask.map(|p| p.value()),
             }],
             None => Vec::new(),
         };

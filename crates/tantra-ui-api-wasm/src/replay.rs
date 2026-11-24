@@ -52,9 +52,9 @@ pub fn replay_ticks<'a>(ticks: impl IntoIterator<Item = &'a Tick>) -> Option<Pos
     Some(PositionView {
         instrument,
         last_price,
-        total_volume: Quantity::new(total_volume),
-        high: Price::new(high.unwrap_or(last_price.value())),
-        low: Price::new(low.unwrap_or(last_price.value())),
+        total_volume: Quantity::try_new(total_volume).expect("sum of non-negative tick volumes"),
+        high: Price::try_new(high.unwrap_or(last_price.value())).expect("valid high price"),
+        low: Price::try_new(low.unwrap_or(last_price.value())).expect("valid low price"),
     })
 }
 
@@ -63,11 +63,16 @@ fn tick_volume(tick: &Tick) -> Option<Quantity> {
         Tick::Ltp { volume, .. } => Some(*volume),
         Tick::Quote {
             bid_qty, ask_qty, ..
-        } => Some(Quantity::new(bid_qty.value() + ask_qty.value())),
+        } => Some(
+            Quantity::try_new(bid_qty.value() + ask_qty.value())
+                .expect("sum of non-negative quote quantities"),
+        ),
         Tick::Depth { bids, asks, .. } => {
             let bid_vol = bids.iter().map(|b| b.quantity.value()).sum::<Decimal>();
             let ask_vol = asks.iter().map(|a| a.quantity.value()).sum::<Decimal>();
-            Some(Quantity::new(bid_vol + ask_vol))
+            Some(
+                Quantity::try_new(bid_vol + ask_vol).expect("sum of non-negative depth quantities"),
+            )
         }
     }
 }

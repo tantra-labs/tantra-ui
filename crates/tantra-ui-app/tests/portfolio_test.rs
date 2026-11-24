@@ -17,7 +17,7 @@ fn inr(amount: &str) -> Money {
 }
 
 fn inst(symbol: &str) -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, symbol)
+    InstrumentId::try_new(Exchange::Nse, symbol).unwrap()
 }
 
 fn snapshot() -> PortfolioSnapshot {
@@ -31,7 +31,7 @@ fn snapshot() -> PortfolioSnapshot {
             instrument: inst("RELIANCE"),
             side: tantra_core::instrument::PositionSide::Long,
             quantity: Quantity::from_u64(50),
-            avg_price: Price::new(dec("2390.00")),
+            avg_price: Price::try_new(dec("2390.00")).unwrap(),
             unrealized_pnl: inr("587.50"),
             realized_pnl: inr("120.00"),
         }],

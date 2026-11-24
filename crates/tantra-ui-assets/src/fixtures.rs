@@ -31,12 +31,12 @@ fn utc(y: i32, m: u32, d: u32, h: u32, min: u32) -> DateTime<Utc> {
 
 /// NSE:RELIANCE-EQ instrument.
 pub fn reliance() -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, "RELIANCE")
+    InstrumentId::try_new(Exchange::Nse, "RELIANCE").expect("valid fixture")
 }
 
 /// NSE:TCS instrument.
 pub fn tcs() -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, "TCS")
+    InstrumentId::try_new(Exchange::Nse, "TCS").expect("valid fixture")
 }
 
 /// A deterministic one-day bar series for RELIANCE.
@@ -52,10 +52,10 @@ pub fn reliance_bars(n: usize) -> Vec<Bar> {
         close = open + dec(&format!("{}", if i % 2 == 0 { 2 } else { -1 }));
         bars.push(Bar {
             instrument: inst.clone(),
-            open: Price::new(open),
-            high: Price::new(high),
-            low: Price::new(low),
-            close: Price::new(close),
+            open: Price::try_new(open).expect("valid price"),
+            high: Price::try_new(high).expect("valid price"),
+            low: Price::try_new(low).expect("valid price"),
+            close: Price::try_new(close).expect("valid price"),
             volume: Quantity::from_u64(10_000 + u64::from(i as u32) * 250),
             timestamp: ts,
         });
@@ -68,11 +68,11 @@ pub fn reliance_bars(n: usize) -> Vec<Bar> {
 pub fn reliance_quote_tick() -> Tick {
     Tick::Quote {
         instrument: reliance(),
-        bid: Price::new(dec("2401.50")),
-        ask: Price::new(dec("2401.90")),
+        bid: Price::try_new(dec("2401.50")).expect("valid price"),
+        ask: Price::try_new(dec("2401.90")).expect("valid price"),
         bid_qty: Quantity::from_u64(350),
         ask_qty: Quantity::from_u64(220),
-        last_price: Some(Price::new(dec("2401.75"))),
+        last_price: Some(Price::try_new(dec("2401.75")).expect("valid price")),
         exchange_ts: utc(2026, 11, 3, 10, 30),
         receive_ts: utc(2026, 11, 3, 10, 30),
         band: None,
@@ -85,29 +85,29 @@ pub fn tcs_depth_tick() -> Tick {
         instrument: tcs(),
         bids: vec![
             DepthLevel {
-                price: Price::new(dec("3400.10")),
+                price: Price::try_new(dec("3400.10")).expect("valid price"),
                 quantity: Quantity::from_u64(120),
                 orders_count: Some(4),
             },
             DepthLevel {
-                price: Price::new(dec("3400.00")),
+                price: Price::try_new(dec("3400.00")).expect("valid price"),
                 quantity: Quantity::from_u64(80),
                 orders_count: Some(3),
             },
         ],
         asks: vec![
             DepthLevel {
-                price: Price::new(dec("3400.40")),
+                price: Price::try_new(dec("3400.40")).expect("valid price"),
                 quantity: Quantity::from_u64(95),
                 orders_count: Some(5),
             },
             DepthLevel {
-                price: Price::new(dec("3400.60")),
+                price: Price::try_new(dec("3400.60")).expect("valid price"),
                 quantity: Quantity::from_u64(140),
                 orders_count: Some(6),
             },
         ],
-        last_price: Some(Price::new(dec("3400.25"))),
+        last_price: Some(Price::try_new(dec("3400.25")).expect("valid price")),
         exchange_ts: utc(2026, 11, 3, 10, 30),
         receive_ts: utc(2026, 11, 3, 10, 30),
     }
@@ -126,7 +126,7 @@ pub fn portfolio_snapshot() -> PortfolioSnapshot {
                 instrument: reliance(),
                 side: PositionSide::Long,
                 quantity: Quantity::from_u64(50),
-                avg_price: Price::new(dec("2390.00")),
+                avg_price: Price::try_new(dec("2390.00")).expect("valid price"),
                 unrealized_pnl: Money::new(dec("587.50"), Currency::Inr),
                 realized_pnl: Money::new(dec("120.00"), Currency::Inr),
             },
@@ -134,7 +134,7 @@ pub fn portfolio_snapshot() -> PortfolioSnapshot {
                 instrument: tcs(),
                 side: PositionSide::Short,
                 quantity: Quantity::from_u64(20),
-                avg_price: Price::new(dec("3410.00")),
+                avg_price: Price::try_new(dec("3410.00")).expect("valid price"),
                 unrealized_pnl: Money::new(dec("195.00"), Currency::Inr),
                 realized_pnl: Money::new(dec("-40.00"), Currency::Inr),
             },

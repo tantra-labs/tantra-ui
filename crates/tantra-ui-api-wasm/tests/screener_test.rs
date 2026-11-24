@@ -15,7 +15,7 @@ fn dec(s: &str) -> Decimal {
 }
 
 fn inst(symbol: &str) -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, symbol)
+    InstrumentId::try_new(Exchange::Nse, symbol).unwrap()
 }
 
 fn metric(name: &str) -> MetricRef {
@@ -66,7 +66,7 @@ fn filter_gt_plus_between() {
     let symbols = resp
         .rows
         .iter()
-        .map(|r| r.instrument.symbol.clone())
+        .map(|r| r.instrument.symbol().to_string())
         .collect::<Vec<_>>();
     assert!(symbols.contains(&"RELIANCE".to_string()));
     assert!(symbols.contains(&"TCS".to_string()));
@@ -112,8 +112,8 @@ fn sort_desc_and_limit() {
     let resp = apply_scan(&u, &request).unwrap();
     assert_eq!(resp.rows.len(), 2);
     // Descending by pe: TCS (25), RELIANCE (14.5) are the top two.
-    assert_eq!(resp.rows[0].instrument.symbol, "TCS");
-    assert_eq!(resp.rows[1].instrument.symbol, "RELIANCE");
+    assert_eq!(resp.rows[0].instrument.symbol(), "TCS");
+    assert_eq!(resp.rows[1].instrument.symbol(), "RELIANCE");
     // total_matched counts before limit.
     assert_eq!(resp.total_matched, 3);
 }

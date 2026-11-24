@@ -22,7 +22,7 @@ use tantra_ui_client::ClientEvent;
 const TS0: i64 = 1_700_000_000;
 
 fn reliance() -> InstrumentId {
-    InstrumentId::new(Exchange::Nse, "RELIANCE")
+    InstrumentId::try_new(Exchange::Nse, "RELIANCE").unwrap()
 }
 
 fn ts() -> DateTime<Utc> {
