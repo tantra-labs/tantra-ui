@@ -1,6 +1,7 @@
 //! Tests for the portfolio feature.
 
 use rust_decimal::Decimal;
+use tantra_core::AccountId;
 use tantra_core::portfolio::{
     PortfolioAccount, PortfolioMode, PortfolioPosition, PortfolioSnapshot, PortfolioSource,
     PortfolioTotals,
@@ -23,7 +24,7 @@ fn inst(symbol: &str) -> InstrumentId {
 fn snapshot() -> PortfolioSnapshot {
     PortfolioSnapshot {
         account: PortfolioAccount {
-            account_id: "a1".to_string(),
+            account_id: AccountId::new("a1"),
             mode: PortfolioMode::Paper,
             source: PortfolioSource::Simulated,
         },

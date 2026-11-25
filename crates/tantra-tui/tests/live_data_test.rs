@@ -11,9 +11,9 @@ use rust_decimal::Decimal;
 use tantra_core::chrono::{DateTime, Utc};
 use tantra_core::uuid::Uuid;
 use tantra_core::{
-    Bar, Exchange, InstrumentId, Money, OrderAck, OrderEvent, OrderStatus, PortfolioAccount,
-    PortfolioMode, PortfolioPosition, PortfolioSnapshot, PortfolioSource, PortfolioTotals,
-    PositionSide, Price, Quantity, ScreenerRow, ScreenerScanResponse, Tick,
+    AccountId, Bar, Exchange, InstrumentId, Money, OrderAck, OrderEvent, OrderStatus,
+    PortfolioAccount, PortfolioMode, PortfolioPosition, PortfolioSnapshot, PortfolioSource,
+    PortfolioTotals, PositionSide, Price, Quantity, ScreenerRow, ScreenerScanResponse, Tick,
 };
 use tantra_tui::live_data::{LiveData, PortfolioSummary, WatchlistRow};
 use tantra_ui_client::{ClientEvent, SystemStatus};
@@ -204,7 +204,7 @@ fn cancelled_order_appends_row() {
 fn portfolio_snapshot() -> PortfolioSnapshot {
     PortfolioSnapshot {
         account: PortfolioAccount {
-            account_id: "acct-1".to_string(),
+            account_id: AccountId::new("acct-1"),
             mode: PortfolioMode::Paper,
             source: PortfolioSource::Simulated,
         },

@@ -1,6 +1,7 @@
 //! Unit tests for `tantra-ui-core` portfolio view primitives.
 
 use rust_decimal::Decimal;
+use tantra_core::AccountId;
 use tantra_core::instrument::PositionSide;
 use tantra_core::portfolio::{
     PortfolioAccount, PortfolioMode, PortfolioPosition, PortfolioSnapshot, PortfolioSource,
@@ -24,7 +25,7 @@ fn inst(symbol: &str) -> InstrumentId {
 fn snapshot_with_positions() -> PortfolioSnapshot {
     PortfolioSnapshot {
         account: PortfolioAccount {
-            account_id: "a1".to_string(),
+            account_id: AccountId::new("a1"),
             mode: PortfolioMode::Paper,
             source: PortfolioSource::Simulated,
         },

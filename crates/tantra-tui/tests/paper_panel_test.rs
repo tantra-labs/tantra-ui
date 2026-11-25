@@ -6,6 +6,7 @@
 //! offline fixture fallback renders only when no paper events have arrived.
 
 use rust_decimal::Decimal;
+use tantra_core::AccountId;
 use tantra_core::chrono::{DateTime, TimeZone, Utc};
 use tantra_core::instrument::PositionSide;
 use tantra_core::order::{FillReport, OrderAck, OrderEvent, OrderSide, OrderStatus};
@@ -72,7 +73,7 @@ fn paper_event_batch() -> Vec<ClientEvent> {
         }),
         ClientEvent::Portfolio(PortfolioSnapshot {
             account: PortfolioAccount {
-                account_id: "paper".to_string(),
+                account_id: AccountId::new("paper"),
                 mode: PortfolioMode::Paper,
                 source: PortfolioSource::Simulated,
             },

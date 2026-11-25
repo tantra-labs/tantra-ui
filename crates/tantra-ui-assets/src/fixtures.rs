@@ -6,6 +6,7 @@
 
 use chrono::{DateTime, TimeZone, Utc};
 use rust_decimal::Decimal;
+use tantra_core::AccountId;
 use tantra_core::instrument::PositionSide;
 use tantra_core::market::{Bar, DepthLevel, Tick};
 use tantra_core::portfolio::{
@@ -117,7 +118,7 @@ pub fn tcs_depth_tick() -> Tick {
 pub fn portfolio_snapshot() -> PortfolioSnapshot {
     PortfolioSnapshot {
         account: PortfolioAccount {
-            account_id: "demo-account-1".to_string(),
+            account_id: AccountId::new("demo-account-1"),
             mode: PortfolioMode::Paper,
             source: PortfolioSource::Simulated,
         },
