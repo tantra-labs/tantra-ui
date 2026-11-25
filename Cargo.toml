@@ -106,6 +106,7 @@ codegen-units = 1
 
 [profile.prod]
 inherits = "release"
-lto = true
+lto = "thin"
 codegen-units = 1
+strip = "symbols"
 panic = "abort"
