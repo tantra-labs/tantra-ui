@@ -236,6 +236,9 @@ pub struct ServeArgs {
     /// Bearer-token file (TOML); enables auth when set. Omit to run with auth off.
     #[arg(long)]
     pub tokens_file: Option<PathBuf>,
+    /// Explicitly permit binding a non-loopback address without auth (or set TANTRA_ALLOW_INSECURE_BIND=1).
+    #[arg(long = "allow-insecure-bind")]
+    pub allow_insecure_bind: bool,
 }
 
 /// Arguments for `tantra jobs`.
@@ -739,6 +742,9 @@ pub enum CliCommand {
         /// Bearer-token file (TOML); enables auth when set. Omit to run with auth off.
         #[arg(long)]
         tokens_file: Option<PathBuf>,
+        /// Explicitly permit binding a non-loopback address without auth (or set TANTRA_ALLOW_INSECURE_BIND=1).
+        #[arg(long = "allow-insecure-bind")]
+        allow_insecure_bind: bool,
     },
     /// Manage autonomous scheduled jobs and approvals.
     Jobs {
@@ -1167,6 +1173,7 @@ impl From<Cli> for CliArgs {
                 portfolios_dir,
                 journals_dir,
                 tokens_file,
+                allow_insecure_bind,
             }) => Command::Serve(ServeArgs {
                 data_dir,
                 addr,
@@ -1175,6 +1182,7 @@ impl From<Cli> for CliArgs {
                 portfolios_dir,
                 journals_dir,
                 tokens_file,
+                allow_insecure_bind,
             }),
             Some(CliCommand::Jobs { subcommand }) => Command::Jobs(match subcommand {
                 None | Some(JobsSubcommand::List) => JobsArgs::List,

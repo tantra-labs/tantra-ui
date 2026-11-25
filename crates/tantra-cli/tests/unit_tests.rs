@@ -147,6 +147,7 @@ fn parse_cli_roundtrip_serve() {
             portfolios_dir: None,
             journals_dir: None,
             tokens_file: None,
+            allow_insecure_bind: true,
         }),
         ..Default::default()
     };
@@ -161,6 +162,7 @@ fn parse_cli_roundtrip_serve() {
             portfolios_dir: None,
             journals_dir: None,
             tokens_file: None,
+            allow_insecure_bind: true,
         })
     );
 }

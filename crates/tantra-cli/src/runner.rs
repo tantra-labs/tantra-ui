@@ -666,6 +666,7 @@ fn run_serve(args: &ServeArgs) -> Result<CommandOutcome, CliError> {
         config.runs.journals_dir = dir.clone();
     }
     config.auth.tokens_file = args.tokens_file.clone();
+    config.allow_insecure_bind = args.allow_insecure_bind;
 
     tantra_runtime_api_rest::bootstrap::run_server_blocking(&config)
         .map_err(|e| CliError::Execution(e.to_string()))?;
