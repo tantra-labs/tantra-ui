@@ -288,9 +288,9 @@ impl LiveData {
             }
             ClientEvent::Portfolio(snapshot) => {
                 self.portfolio = Some(PortfolioSummary {
-                    cash: snapshot.totals.cash.amount,
-                    net_worth: snapshot.totals.net_worth.amount,
-                    total_pnl: snapshot.totals.total_pnl.amount,
+                    cash: snapshot.totals.cash.amount(),
+                    net_worth: snapshot.totals.net_worth.amount(),
+                    total_pnl: snapshot.totals.total_pnl.amount(),
                     positions: snapshot.positions.len(),
                 });
                 self.paper_positions = snapshot
@@ -301,8 +301,8 @@ impl LiveData {
                         quantity: p.quantity.value(),
                     })
                     .collect();
-                self.paper_cash = snapshot.totals.cash.amount;
-                self.paper_equity = snapshot.totals.net_worth.amount;
+                self.paper_cash = snapshot.totals.cash.amount();
+                self.paper_equity = snapshot.totals.net_worth.amount();
             }
             ClientEvent::System(status) => {
                 self.connected = status.healthy;

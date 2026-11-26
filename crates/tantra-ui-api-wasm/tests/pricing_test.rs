@@ -16,7 +16,7 @@ fn price(s: &str) -> Price {
 #[test]
 fn notional_is_price_times_quantity() {
     let n = notional(price("2500"), Quantity::from_u64(10));
-    assert_eq!(n.amount, dec("25000"));
+    assert_eq!(n.amount(), dec("25000"));
 }
 
 #[test]
@@ -27,7 +27,7 @@ fn long_pnl_profit_and_loss() {
         price("110"),
         Quantity::from_u64(5),
     );
-    assert_eq!(profit.amount, dec("50"));
+    assert_eq!(profit.amount(), dec("50"));
 
     let loss = pnl(
         OrderSide::Buy,
@@ -35,7 +35,7 @@ fn long_pnl_profit_and_loss() {
         price("90"),
         Quantity::from_u64(5),
     );
-    assert_eq!(loss.amount, dec("-50"));
+    assert_eq!(loss.amount(), dec("-50"));
 }
 
 #[test]
@@ -46,7 +46,7 @@ fn short_pnl_inverts() {
         price("90"),
         Quantity::from_u64(5),
     );
-    assert_eq!(profit.amount, dec("50"));
+    assert_eq!(profit.amount(), dec("50"));
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn mtm_uses_current_price() {
         price("105"),
         Quantity::from_u64(2),
     );
-    assert_eq!(m.amount, dec("10"));
+    assert_eq!(m.amount(), dec("10"));
 }
 
 #[test]

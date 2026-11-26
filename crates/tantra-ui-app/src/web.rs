@@ -555,7 +555,7 @@ pub fn system_lines(s: &SystemFeature) -> Vec<(String, String)> {
 
 /// Format a `Money` value as `"<amount> <currency>"`.
 fn money_text(m: &Money) -> String {
-    format!("{} {:?}", m.amount, m.currency)
+    format!("{} {:?}", m.amount(), m.currency())
 }
 
 /// Portfolio totals as `(label, money text)` lines.

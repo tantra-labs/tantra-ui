@@ -95,5 +95,5 @@ fn holding_row_constructor() {
         Price::try_new(dec("3400.00")).unwrap(),
         inr("34000.00"),
     );
-    assert_eq!(row.current_value.amount, dec("34000.00"));
+    assert_eq!(row.current_value.amount(), dec("34000.00"));
 }

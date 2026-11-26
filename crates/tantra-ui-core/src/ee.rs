@@ -218,7 +218,7 @@ pub fn studio_ee_positions(intents: &[PositionIntent]) -> Vec<(String, String, S
             (
                 p.instrument.to_string(),
                 format!("{} {}", side_label(p.side), p.quantity.value()),
-                format!("₹{}", p.risk_cap.amount),
+                format!("₹{}", p.risk_cap.amount()),
             )
         })
         .collect()

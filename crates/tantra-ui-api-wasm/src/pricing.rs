@@ -1,11 +1,12 @@
 //! Simple pricing helpers: notional, P&L, and mark-to-market.
 
 use rust_decimal::Decimal;
-use tantra_core::types::{InstrumentId, Money, Price, Quantity};
+use tantra_core::types::{Currency, InstrumentId, Money, Price, Quantity};
 
 /// Notional value of an order/position in INR.
 pub fn notional(price: Price, quantity: Quantity) -> Money {
-    Money::notional(price, quantity)
+    // INR: these wasm helpers price NSE/BSE instruments (documented as INR).
+    Money::notional(price, quantity, Currency::Inr)
 }
 
 /// Realized P&L for a buy-then-sell or sell-then-buy round trip.

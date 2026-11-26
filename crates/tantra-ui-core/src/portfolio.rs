@@ -183,13 +183,13 @@ impl PortfolioViewModel {
     pub fn unrealized_pnl_total(&self) -> Decimal {
         self.positions
             .iter()
-            .fold(Decimal::ZERO, |acc, p| acc + p.unrealized_pnl.amount)
+            .fold(Decimal::ZERO, |acc, p| acc + p.unrealized_pnl.amount())
     }
 
     /// Sum of realized PnL across all positions, as an INR amount.
     pub fn realized_pnl_total(&self) -> Decimal {
         self.positions
             .iter()
-            .fold(Decimal::ZERO, |acc, p| acc + p.realized_pnl.amount)
+            .fold(Decimal::ZERO, |acc, p| acc + p.realized_pnl.amount())
     }
 }

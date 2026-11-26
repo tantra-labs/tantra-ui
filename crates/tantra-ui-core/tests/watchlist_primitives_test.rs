@@ -72,5 +72,5 @@ fn carries_status_and_account() {
         inr("583862.50"),
     ));
     assert!(view.status.unwrap().is_open());
-    assert_eq!(view.account.unwrap().net_worth.amount, dec("583862.50"));
+    assert_eq!(view.account.unwrap().net_worth.amount(), dec("583862.50"));
 }

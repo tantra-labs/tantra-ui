@@ -52,8 +52,8 @@ fn account_summary_holds_totals() {
         inr("1250.75"),
         inr("70000"),
     );
-    assert_eq!(summary.cash.amount, dec("50000"));
-    assert_eq!(summary.margin_available.amount, dec("30000"));
-    assert_eq!(summary.total_pnl.amount, dec("1250.75"));
-    assert_eq!(summary.net_worth.amount, dec("70000"));
+    assert_eq!(summary.cash.amount(), dec("50000"));
+    assert_eq!(summary.margin_available.amount(), dec("30000"));
+    assert_eq!(summary.total_pnl.amount(), dec("1250.75"));
+    assert_eq!(summary.net_worth.amount(), dec("70000"));
 }

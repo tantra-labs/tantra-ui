@@ -62,7 +62,7 @@ fn ingest_snapshot_projects_view() {
     f.ingest_snapshot(&snapshot());
     assert!(f.has_data());
     assert_eq!(f.view.positions.len(), 1);
-    assert_eq!(f.totals().cash.amount, dec("450000.00"));
+    assert_eq!(f.totals().cash.amount(), dec("450000.00"));
     assert_eq!(f.view.unrealized_pnl_total(), dec("587.50"));
 }
 

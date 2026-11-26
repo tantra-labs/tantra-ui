@@ -55,9 +55,9 @@ fn portfolio_snapshot_totals_balance() {
     let snap = portfolio_snapshot();
     assert_eq!(snap.positions.len(), 2);
     let totals = &snap.totals;
-    assert!(totals.margin_available.amount > Decimal::ZERO);
+    assert!(totals.margin_available.amount() > Decimal::ZERO);
     // margin used + available should not exceed cash + net worth sanity check
-    assert!(totals.cash.amount >= totals.margin_used.amount);
+    assert!(totals.cash.amount() >= totals.margin_used.amount());
 }
 
 #[test]
