@@ -15,8 +15,10 @@ fn price(s: &str) -> Price {
 
 #[test]
 fn notional_is_price_times_quantity() {
-    let n = notional(price("2500"), Quantity::from_u64(10));
+    let inst = InstrumentId::try_new(Exchange::Nse, "RELIANCE").unwrap();
+    let n = notional(&inst, price("2500"), Quantity::from_u64(10));
     assert_eq!(n.amount(), dec("25000"));
+    assert_eq!(n.currency(), Exchange::Nse.currency());
 }
 
 #[test]

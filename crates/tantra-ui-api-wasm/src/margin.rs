@@ -1,21 +1,20 @@
 //! Margin estimation for a prospective order.
 
 use rust_decimal::Decimal;
-use tantra_core::types::{Currency, InstrumentId, Money, Price, Quantity};
+use tantra_core::types::{InstrumentId, Money, Price, Quantity};
 
 /// Estimate the margin blocked by an order.
 ///
 /// Margin is `notional / leverage` when a leverage factor is given; for
 /// fully-collateralized products (leverage of 1) this equals the notional.
-/// Returns [`Money`] in INR.
+/// Returns [`Money`] in the instrument venue's currency.
 pub fn margin_required(
-    _instrument: &InstrumentId,
+    instrument: &InstrumentId,
     price: Price,
     quantity: Quantity,
     leverage: Decimal,
 ) -> Money {
-    // INR: these wasm helpers price NSE/BSE instruments (documented as INR).
-    let notional = Money::notional(price, quantity, Currency::Inr);
+    let notional = Money::notional(price, quantity, instrument.exchange().currency());
     let safe_leverage = if leverage <= Decimal::ZERO {
         Decimal::ONE
     } else {
